@@ -4,10 +4,7 @@ import android.os.SystemClock
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
-// В ML Kit 19.0.0 классы разнесены по двум пакетам: recognition (распознавание)
-// и common (штрихи, точки, результаты — общие с другими функциями Digital Ink).
-import com.google.mlkit.vision.digitalink.common.Point
-import com.google.mlkit.vision.digitalink.common.Stroke
+// В ML Kit 19.0.0 классы распознавания переехали в пакет ...digitalink.recognition.
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
 import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
@@ -195,8 +192,8 @@ class HandwritingEngine(private val log: (String) -> Unit) {
         try {
             val inkBuilder = Ink.builder()
             for (s in strokes) {
-                val sb = Stroke.builder()
-                for (p in s.points) sb.addPoint(Point.create(p.x, p.y, p.t))
+                val sb = Ink.Stroke.builder()
+                for (p in s.points) sb.addPoint(Ink.Point.create(p.x, p.y, p.t))
                 inkBuilder.addStroke(sb.build())
             }
             val ink = inkBuilder.build()

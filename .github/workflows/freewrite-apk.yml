@@ -68,10 +68,13 @@ jobs:
             unzip -l "$jar" | awk '{print $4}' | grep -i 'digitalink' | grep -v '/internal/\|/zz\|/downloading/' | head -120
           done
           cp=$(ls /tmp/mlkit/*.jar | tr '\n' ':')
-          for c in $(unzip -l /tmp/mlkit/digital-ink-recognition-*.jar /tmp/mlkit/digital-ink-common-*.jar 2>/dev/null \
-                | awk '{print $4}' | grep -E '^com/google/mlkit/vision/digitalink/(recognition|common)/[A-Za-z$]+\.class$' \
-                | grep -v 'AutoValue' | sed 's/\.class$//; s#/#.#g'); do
-            javap -public -cp "$cp" "$c" || true
+          for j in /tmp/mlkit/digital-ink-recognition-*.jar /tmp/mlkit/digital-ink-common-*.jar; do
+            [ -f "$j" ] || continue
+            for c in $(unzip -l "$j" | awk '{print $4}' \
+                  | grep -E '^com/google/mlkit/vision/digitalink/(recognition|common)/[A-Za-z$]+\.class$' \
+                  | grep -v 'AutoValue' | sed 's/\.class$//; s#/#.#g'); do
+              javap -public -cp "$cp" "$c" || true
+            done
           done
 
       - name: Prepare files
