@@ -44,7 +44,7 @@ import kotlin.math.roundToInt
  * Слева/сверху — панель: модель распознавания, результат, данные о пере, сведения об устройстве
  * и отчёт. Справа/снизу — поле для свободного письма пером.
  */
-class MainActivity : Activity(), InkCanvasView.Listener {
+class DiagnosticsActivity : Activity(), InkCanvasView.Listener {
 
     private class ModelRow(val status: TextView, val download: Button, val delete: Button)
 
@@ -669,7 +669,7 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         canvasColumn.addView(toolsScroll, LinearLayout.LayoutParams(MATCH, WRAP))
         canvasView = InkCanvasView(this).apply {
             background = rounded(PAPER, LINE, 14)
-            listener = this@MainActivity
+            listener = this@DiagnosticsActivity
         }
         canvasColumn.addView(canvasView, LinearLayout.LayoutParams(MATCH, 0, 1f).apply { topMargin = dp(4) })
 

@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Макет «рабочий журнал»: холодный серый стол, белая бумага, тёмно-синие чернила, оранжевый акцент. -->
     <style name="Theme.FreeWrite" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:colorPrimary">#2F4B7C</item>
-        <item name="android:colorPrimaryDark">#22385E</item>
-        <item name="android:colorAccent">#2F4B7C</item>
-        <item name="android:statusBarColor">#22385E</item>
-        <item name="android:navigationBarColor">#F4F1EA</item>
-        <item name="android:windowBackground">#F4F1EA</item>
+        <item name="android:colorPrimary">#16223A</item>
+        <item name="android:colorPrimaryDark">#FCFDFE</item>
+        <item name="android:colorAccent">#D4470C</item>
+        <item name="android:statusBarColor">#FCFDFE</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#E6EAF0</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">#E6EAF0</item>
     </style>
 </resources>

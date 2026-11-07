@@ -12,8 +12,8 @@ android {
         // HarmonyOS 4.x даёт приложениям Android 12 (API 31); 26 — запас для других планшетов.
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 6
+        versionName = "0.2.0"
     }
 
     signingConfigs {
@@ -73,6 +73,8 @@ dependencies {
     // Google ML Kit Digital Ink Recognition: распознаёт штрихи пера на самом устройстве.
     // Языковая модель (~20 МБ) скачивается один раз, дальше работает без интернета.
     implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
+    // FileProvider: передать скачанное обновление системному установщику.
+    implementation("androidx.core:core:1.13.1")
 
     // Только для проверок на компьютере (в APK не попадает).
     testImplementation("junit:junit:4.13.2")

@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Интернет нужен только для первой загрузки языковой модели (~20 МБ). -->
+    <!-- Интернет: один раз скачать языковую модель (~20 МБ) и проверять обновления FreeWrite. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Ставить скачанное обновление FreeWrite (Android всё равно спросит подтверждение). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Проверяем, установлены ли сервисы Google и Huawei (для отчёта). -->
     <queries>
@@ -11,6 +13,10 @@
         <package android:name="com.android.vending" />
         <package android:name="com.huawei.hwid" />
         <package android:name="com.huawei.appmarket" />
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="image/*" />
+        </intent>
     </queries>
 
     <application
@@ -22,15 +28,40 @@
         android:supportsRtl="false"
         android:theme="@style/Theme.FreeWrite">
 
+        <!-- Ежедневник: стартовый экран -->
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
-            android:windowSoftInputMode="adjustResize|stateHidden">
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Запись: письмо в текст -->
+        <activity
+            android:name=".NoteActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <!-- Проверка планшета (этап 1) и отчёт для разработчика -->
+        <activity
+            android:name=".DiagnosticsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <!-- Отдаёт скачанный APK системному установщику -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
