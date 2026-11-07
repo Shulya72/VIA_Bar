@@ -252,12 +252,13 @@ class HandwritingEngine(private val log: (String) -> Unit) {
         }
         State.DELETING -> "удаляю…"
         State.READY -> "✅ готова" + (lang.downloadSeconds?.let { " (скачана за ${it.toInt()} с)" } ?: "")
-        State.ERROR -> "❌ ошибка: ${lang.error}"
+        State.ERROR -> "❌ ошибка: ${shortError(lang.error)}"
     }
 
     fun reportLines(): List<String> = languages.map { lang ->
         val sb = StringBuilder()
-        sb.append(lang.title).append(" (").append(lang.tag).append("): ").append(stateText(lang))
+        sb.append(lang.title).append(" (").append(lang.tag).append("): ")
+        if (lang.state == State.ERROR) sb.append("❌ ошибка: ").append(lang.error) else sb.append(stateText(lang))
         lang.firstRecognitionMs?.let { sb.append("; первое распознавание ").append(it).append(" мс") }
         if (lang.recognitions > 0) {
             sb.append("; распознаваний ").append(lang.recognitions)
@@ -291,6 +292,17 @@ class HandwritingEngine(private val log: (String) -> Unit) {
     }
 
     companion object {
+        /**
+         * Короткая версия ошибки для экрана: первая строка, не длиннее 160 символов.
+         * Полный текст (с причинами и подробностями) идёт в отчёт.
+         */
+        fun shortError(error: String?): String {
+            val first = error.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim()
+            val cut = if (first.length > 160) first.take(160) + "…" else first
+            val more = error.orEmpty().trim().length > cut.length
+            return if (more) "$cut (полностью — в отчёте)" else cut
+        }
+
         /** Понятное описание ошибки с кодом ML Kit и цепочкой причин — для отчёта. */
         fun describe(t: Throwable): String {
             val sb = StringBuilder()

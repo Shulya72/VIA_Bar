@@ -262,7 +262,7 @@ class MainActivity : Activity(), InkCanvasView.Listener {
             candidatesVersion = -1
             resultText.text = "—"
             resultInfo.setTextColor(ERROR)
-            resultInfo.text = out.error
+            resultInfo.text = HandwritingEngine.shortError(out.error)
             addAttempt("$stamp #$n ${lang.tag}: ОШИБКА — ${out.error}")
             return
         }

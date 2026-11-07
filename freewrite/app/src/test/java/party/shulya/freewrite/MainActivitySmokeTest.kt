@@ -8,6 +8,7 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,8 +25,11 @@ import java.time.Duration
 /**
  * Проверка экрана на компьютере (Robolectric), без планшета.
  * Экран размером с MatePad Mini (2560×1600, плотность 2x): запуск, штрих пером, касание пальцем.
- * Скриншоты — в app/build/screenshots/ (смотреть глазами; распознавание здесь не работает —
- * модели ML Kit на компьютере нет).
+ * Скриншоты — в app/build/screenshots/ (смотреть глазами).
+ *
+ * ML Kit здесь не работает и это ожидаемо: Robolectric исполняет код на обычной Java, а ML Kit
+ * собран под Android (внутренние классы не проходят проверку Java — VerifyError, библиотека
+ * libdigitalink.so — только для Android). Поэтому в разделе 1 на скриншотах будет ошибка ML Kit.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -57,6 +61,12 @@ class MainActivitySmokeTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(900))
 
         screenshot(activity.window.decorView, "portrait.png")
+
+        // Нижняя часть панели: разделы «Перо», «Устройство», «Отчёт».
+        val scroll = find(activity.window.decorView, ScrollView::class.java)
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        idle()
+        screenshot(activity.window.decorView, "portrait-panel-bottom.png")
     }
 
     @Test

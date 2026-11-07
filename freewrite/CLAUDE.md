@@ -37,7 +37,7 @@ MAL-CD56). Пишешь пером в любом месте поля, распо
   `mcp__github__get_job_logs`. При падении шаг «ML Kit classes (diagnostic)» печатает классы ML Kit.
 - В CI после сборки идёт шаг «Screen check (Robolectric)» (`app/src/test/.../MainActivitySmokeTest.kt`):
   экран размером с MatePad Mini вертикально и горизонтально, штрих пером, касание пальцем.
-  Скриншоты `screen-portrait.png` и `screen-landscape.png` прикладываются к выпуску.
+  Скриншоты `screen-portrait.png`, `screen-portrait-panel-bottom.png`, `screen-landscape.png` прикладываются к выпуску. ML Kit в Robolectric не работает (VerifyError, нет `libdigitalink.so` для обычной Java) — ошибка ML Kit на скриншотах ожидаема.
   Шаг не блокирует выкладку APK (`continue-on-error`), результат смотреть в журнале.
 - Готовый APK: выпуск (pre-release) `freewrite-latest`, постоянная ссылка
   https://github.com/Shulya72/bar-menu/releases/download/freewrite-latest/FreeWrite.apk
