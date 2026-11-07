@@ -164,6 +164,20 @@ class ScreensSmokeTest {
         check("", -1, "Привет", "Привет")
     }
 
+    /** Картинка «из галереи» (по ссылке, как её отдаёт выбор файла) копируется к себе. */
+    @Test
+    fun importImage_fromPickedUri() {
+        val bmp = Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888)
+        Canvas(bmp).drawColor(android.graphics.Color.rgb(200, 60, 40))
+        val f = File(ctx.cacheDir, "picked.jpg")
+        FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        val block = NoteStore(ctx).importImage(ctx, android.net.Uri.fromFile(f))
+        assertTrue("картинка должна открыться", block != null)
+        assertEquals(300, block!!.width)
+        assertEquals(200, block.height)
+        assertTrue("файл скопирован", File(File(ctx.filesDir, "note_images"), block.file).exists())
+    }
+
     /** Пример доски: оси, надписи, фото, три метки. */
     private fun sampleBoard(): Board {
         val b = Board.create("Секция 3 · приёмка")

@@ -12,8 +12,8 @@ android {
         // HarmonyOS 4.x даёт приложениям Android 12 (API 31); 26 — запас для других планшетов.
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.3.0"
+        versionCode = 10
+        versionName = "0.3.1"
     }
 
     signingConfigs {

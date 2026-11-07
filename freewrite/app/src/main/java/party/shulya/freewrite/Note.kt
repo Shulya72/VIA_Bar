@@ -157,13 +157,37 @@ class NoteStore(context: Context) {
      * Возвращает блок-картинку или null, если файл не читается.
      */
     fun importImage(context: Context, uri: Uri): Block.Image? {
+        val resolver = context.contentResolver
+        // Сначала только размер. В этом режиме decodeStream всегда возвращает null — это нормально,
+        // размер приходит в bounds.outWidth/outHeight.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+        (resolver.openInputStream(uri) ?: return null).use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         var sample = 1
         while (max(bounds.outWidth, bounds.outHeight) / sample > 2000) sample *= 2
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bmp = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+        var bmp = (resolver.openInputStream(uri) ?: return null).use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+        // Фото с камеры хранят поворот отдельно (EXIF) — поворачиваем, чтобы не легло боком.
+        val degrees = try {
+            resolver.openInputStream(uri)?.use {
+                when (android.media.ExifInterface(it).getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL,
+                )) {
+                    android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+        } catch (_: Throwable) {
+            0f
+        }
+        if (degrees != 0f) {
+            val m = android.graphics.Matrix().apply { postRotate(degrees) }
+            val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            if (rotated !== bmp) bmp.recycle()
+            bmp = rotated
+        }
         val name = UUID.randomUUID().toString() + ".jpg"
         File(imageDir, name).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
         val block = Block.Image(name, bmp.width, bmp.height)
