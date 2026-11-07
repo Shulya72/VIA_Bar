@@ -60,10 +60,18 @@ jobs:
       - name: ML Kit classes (diagnostic)
         if: failure()
         run: |
+          mkdir -p /tmp/mlkit
           find ~/.gradle/caches -name "*.aar" -path "*mlkit*" | sort | while read -r f; do
             echo "== $f"
-            unzip -p "$f" classes.jar > /tmp/classes.jar 2>/dev/null || continue
-            unzip -l /tmp/classes.jar | awk '{print $4}' | grep -i 'digitalink' | grep -v '\$' | head -120
+            jar="/tmp/mlkit/$(basename "$f" .aar).jar"
+            unzip -p "$f" classes.jar > "$jar" 2>/dev/null || continue
+            unzip -l "$jar" | awk '{print $4}' | grep -i 'digitalink' | grep -v '/internal/\|/zz\|/downloading/' | head -120
+          done
+          cp=$(ls /tmp/mlkit/*.jar | tr '\n' ':')
+          for c in $(unzip -l /tmp/mlkit/digital-ink-recognition-*.jar /tmp/mlkit/digital-ink-common-*.jar 2>/dev/null \
+                | awk '{print $4}' | grep -E '^com/google/mlkit/vision/digitalink/(recognition|common)/[A-Za-z$]+\.class$' \
+                | grep -v 'AutoValue' | sed 's/\.class$//; s#/#.#g'); do
+            javap -public -cp "$cp" "$c" || true
           done
 
       - name: Prepare files

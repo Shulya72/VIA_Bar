@@ -4,14 +4,18 @@ import android.os.SystemClock
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.vision.digitalink.DigitalInkRecognition
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModel
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModelIdentifier
-import com.google.mlkit.vision.digitalink.DigitalInkRecognizer
-import com.google.mlkit.vision.digitalink.DigitalInkRecognizerOptions
-import com.google.mlkit.vision.digitalink.Ink
-import com.google.mlkit.vision.digitalink.RecognitionContext
-import com.google.mlkit.vision.digitalink.WritingArea
+// В ML Kit 19.0.0 классы разнесены по двум пакетам: recognition (распознавание)
+// и common (штрихи, точки, результаты — общие с другими функциями Digital Ink).
+import com.google.mlkit.vision.digitalink.common.Point
+import com.google.mlkit.vision.digitalink.common.Stroke
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizer
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizerOptions
+import com.google.mlkit.vision.digitalink.recognition.Ink
+import com.google.mlkit.vision.digitalink.recognition.RecognitionContext
+import com.google.mlkit.vision.digitalink.recognition.WritingArea
 import java.util.Locale
 
 class Candidate(val text: String, val score: Float?)
@@ -191,8 +195,8 @@ class HandwritingEngine(private val log: (String) -> Unit) {
         try {
             val inkBuilder = Ink.builder()
             for (s in strokes) {
-                val sb = Ink.Stroke.builder()
-                for (p in s.points) sb.addPoint(Ink.Point.create(p.x, p.y, p.t))
+                val sb = Stroke.builder()
+                for (p in s.points) sb.addPoint(Point.create(p.x, p.y, p.t))
                 inkBuilder.addStroke(sb.build())
             }
             val ink = inkBuilder.build()
