@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Папка, из которой системный установщик берёт скачанное обновление FreeWrite. -->
-<paths>
-    <cache-path name="updates" path="updates/" />
-</paths>
