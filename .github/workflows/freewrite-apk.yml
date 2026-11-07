@@ -48,10 +48,25 @@ jobs:
       - name: Debug signing key
         uses: actions/cache@v5
         with:
-          path: ~/.android/debug.keystore
-          key: freewrite-debug-keystore-v1
+          path: freewrite-debug.keystore
+          key: freewrite-debug-keystore-v2
+
+      - name: Create signing key if missing
+        working-directory: .
+        run: |
+          if [ ! -f freewrite-debug.keystore ]; then
+            echo "Создаю новый отладочный ключ подписи"
+            keytool -genkeypair -keystore freewrite-debug.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=FreeWrite Debug,O=FreeWrite,C=RU" > /dev/null
+          else
+            echo "Ключ подписи взят из кэша"
+          fi
 
       - name: Build APK
+        env:
+          FREEWRITE_DEBUG_KEYSTORE: ${{ github.workspace }}/freewrite-debug.keystore
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
@@ -87,6 +102,8 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk out/FreeWrite.apk
           ls -la out
           sha256sum out/*.apk
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/apksigner" verify --print-certs out/FreeWrite.apk | grep -E 'DN|SHA-256' || true
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Publish test release

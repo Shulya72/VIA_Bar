@@ -32,9 +32,13 @@ MAL-CD56). Пишешь пером в любом месте поля, распо
   `mcp__github__get_job_logs`. При падении шаг «ML Kit classes (diagnostic)» печатает классы ML Kit.
 - Готовый APK: выпуск (pre-release) `freewrite-latest`, постоянная ссылка
   https://github.com/Shulya72/bar-menu/releases/download/freewrite-latest/FreeWrite.apk
-- Отладочный ключ подписи хранится в кэше Actions (`freewrite-debug-keystore-v1`), чтобы
-  обновления ставились поверх. Если кэш истёк (7 дней без сборок), подпись сменится:
-  Владимиру нужно удалить старую версию перед установкой.
+- Отладочный ключ подписи `freewrite-debug.keystore` создаётся в сборке (keytool) и хранится
+  в кэше Actions (ключ кэша `freewrite-debug-keystore-v2`), в репозиторий не попадает.
+  Gradle берёт его из переменной `FREEWRITE_DEBUG_KEYSTORE`. Так обновления ставятся поверх.
+  Если кэш истёк (7 дней без сборок), подпись сменится: Владимиру нужно удалить старую версию
+  перед установкой. Версия 0.1.0 подписана случайным ключом — с неё на 0.1.1 тоже через удаление.
+- Импорты ML Kit 19.0.0: `com.google.mlkit.vision.digitalink.recognition.*` (`Ink`, `Ink.Stroke`,
+  `Ink.Point`, распознаватель, модель), результаты — в `...digitalink.common`.
 - **Версия:** при каждой сборке для планшета повышать `versionCode` и `versionName`
   в `app/build.gradle.kts`.
 

@@ -12,8 +12,23 @@ android {
         // HarmonyOS 4.x даёт приложениям Android 12 (API 31); 26 — запас для других планшетов.
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // В GitHub Actions подписываем постоянным отладочным ключом (лежит в кэше Actions,
+            // в репозиторий не попадает), чтобы новые версии ставились поверх старых.
+            // Пароли — стандартные для отладочного ключа Android, это не секрет.
+            val ks = System.getenv("FREEWRITE_DEBUG_KEYSTORE")
+            if (!ks.isNullOrBlank() && file(ks).exists()) {
+                storeFile = file(ks)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
