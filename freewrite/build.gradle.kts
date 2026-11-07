@@ -1,0 +1,5 @@
+// Корневой файл сборки: только версии плагинов. Настройки приложения — в app/build.gradle.kts.
+plugins {
+    id("com.android.application") version "8.10.1" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
+}

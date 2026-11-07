@@ -1,0 +1,89 @@
+name: FreeWrite APK
+
+# Сборка тестового APK приложения FreeWrite (папка freewrite/).
+# К сайту бара отношения не имеет: ничего не выкладывает на shulya.party и не трогает main.
+# Готовый APK кладётся в тестовый выпуск (pre-release) «freewrite-latest» — постоянная ссылка
+# для скачивания на планшете:
+# https://github.com/Shulya72/bar-menu/releases/download/freewrite-latest/FreeWrite.apk
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'freewrite/**'
+      - '.github/workflows/freewrite-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: freewrite-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: freewrite
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            freewrite/*.gradle.kts
+            freewrite/app/*.gradle.kts
+            freewrite/gradle/wrapper/gradle-wrapper.properties
+
+      # Один и тот же отладочный ключ подписи между сборками, чтобы новая версия
+      # ставилась поверх старой без удаления. Хранится в кэше Actions (до 7 дней без сборок).
+      - name: Debug signing key
+        uses: actions/cache@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: freewrite-debug-keystore-v1
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Prepare files
+        id: files
+        run: |
+          set -euo pipefail
+          ver=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/FreeWrite-$ver.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk out/FreeWrite.apk
+          ls -la out
+          sha256sum out/*.apk
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Publish test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.files.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag=freewrite-latest
+          gh release delete "$tag" --cleanup-tag --yes || true
+          notes="Тестовая сборка FreeWrite $VERSION (этап 1 — проверка планшета).
+          Коммит: $GITHUB_SHA
+
+          Как установить на Huawei MatePad Mini: откройте на планшете ссылку на FreeWrite.apk,
+          скачайте и установите. Подробная инструкция — freewrite/README.md в ветке ${GITHUB_REF_NAME}."
+          gh release create "$tag" out/*.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "FreeWrite $VERSION — тестовая сборка" \
+            --notes "$notes"
