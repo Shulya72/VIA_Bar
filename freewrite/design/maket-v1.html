@@ -1,0 +1,952 @@
+<title>Макет FreeWrite</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Планшет как рабочий журнал: холодный серый «стол», лист на всю ширину,
+   одна полоса инструментов сверху, плавающая мини-панель письма. Одна светлая тема — бумага. */
+:root {
+  --desk: #E6EAF0;
+  --paper: #FCFDFE;
+  --ink: #16223A;
+  --ink-2: #4B5873;
+  --muted: #8592A8;
+  --rule: #D3DAE5;
+  --line: rgba(40, 80, 140, 0.10);
+  --accent: #D4470C;
+  --accent-soft: #FDE6D8;
+  --pen-blue: #1F4FD1;
+  --pen-red: #C2282B;
+  --ok: #23803A; --ok-soft: #E1F2E4;
+  --warn: #A86A10; --warn-soft: #FCF0D4;
+  --bad: #BE2A2A; --bad-soft: #FBE2E2;
+  --f-ui: "Golos Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Roboto Mono", monospace;
+  --line-h: 36px;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--desk); color: var(--ink); font-family: var(--f-ui); font-size: 15px; overflow: hidden; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: 1fr; }
+.view { min-height: 0; display: grid; grid-template-rows: auto 1fr; }
+
+/* ---------- полоса инструментов ---------- */
+.toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding-block: 6px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+  overflow-x: auto; scrollbar-width: none;
+}
+.toolbar::-webkit-scrollbar { display: none; }
+.tb-title { display: flex; flex-direction: column; flex: none; max-width: 210px; overflow: hidden; margin-right: 8px; }
+.tb-title b { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-title small { font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sep { width: 1px; align-self: stretch; background: var(--rule); margin: 4px 4px; flex: none; }
+.tool {
+  flex: none; display: grid; justify-items: center; gap: 2px;
+  min-width: 54px; padding: 5px 6px 4px; border: 0; border-radius: 10px;
+  background: transparent; cursor: pointer; color: var(--ink-2);
+}
+.tool svg { width: 24px; height: 24px; }
+.tool span { font-size: 11px; line-height: 1.1; white-space: nowrap; }
+.tool:hover { background: var(--desk); }
+.tool[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.tool.back { min-width: 44px; }
+.swatches { display: flex; gap: 6px; padding: 0 4px; flex: none; }
+.sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--rule); cursor: pointer; padding: 0; }
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.spacer { flex: 1 0 8px; }
+.pill {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 6px 10px; border-radius: 999px;
+  background: var(--desk); color: var(--ink-2); border: 0; cursor: pointer; white-space: nowrap;
+}
+.pill input { accent-color: var(--accent); }
+.demo-tag { background: var(--warn-soft); color: var(--warn); font-weight: 500; }
+
+/* ---------- ежедневник ---------- */
+.home { overflow: auto; }
+.home-in {
+  max-width: 980px; margin: 0 auto;
+  padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px;
+}
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+.brand h1 i { font-style: normal; color: var(--accent); }
+.today { font-family: var(--f-mono); color: var(--ink-2); font-size: 14px; }
+.notice {
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 12px 14px; color: var(--ink-2); font-size: 14px; line-height: 1.5; max-width: 72ch;
+}
+.notice b { color: var(--ink); }
+.starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.start {
+  text-align: left; border: 1px solid var(--rule); background: var(--paper); border-radius: 16px;
+  padding: 18px 18px 16px; cursor: pointer; display: grid; gap: 10px; min-width: 0;
+}
+.start:hover { border-color: var(--accent); }
+.start .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.start .ico svg { width: 26px; height: 26px; }
+.start b { font-size: 19px; }
+.start p { margin: 0; color: var(--ink-2); line-height: 1.45; }
+.day h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.list { display: grid; gap: 8px; }
+.item {
+  display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px;
+  text-align: left; cursor: pointer; min-width: 0;
+}
+.item:hover { border-color: var(--ink-2); }
+.item time { font-family: var(--f-mono); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.item .what { min-width: 0; }
+.item .what b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .what small { color: var(--muted); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.kind { background: var(--desk); color: var(--ink-2); }
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.how div { border-top: 2px solid var(--ink); padding-top: 10px; color: var(--ink-2); line-height: 1.45; }
+.how b { color: var(--ink); display: block; margin-bottom: 2px; }
+@media (max-width: 520px) { .item { grid-template-columns: 52px 1fr; } .chips { grid-column: 2; justify-content: flex-start; } }
+
+/* ---------- запись (лист) ---------- */
+.area { position: relative; min-height: 0; overflow: hidden; }
+.scroller { position: absolute; inset: 0; overflow: auto; }
+.sheet {
+  position: relative; margin: 18px auto 40vh; width: min(900px, calc(100% - 24px)); min-height: 1400px;
+  background-color: var(--paper);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line-h) - 1px), var(--line) calc(var(--line-h) - 1px), var(--line) var(--line-h));
+  background-position: 0 92px;
+  border-radius: 6px; box-shadow: 0 1px 2px rgba(22,34,58,.08), 0 8px 30px rgba(22,34,58,.06);
+  padding: 22px 40px 40px 56px;
+  font-size: 19px; line-height: var(--line-h);
+}
+.sheet::before { content: ""; position: absolute; left: 40px; top: 0; bottom: 0; width: 1px; background: rgba(212,71,12,.22); }
+.sheet .title { margin: 0; font-size: 26px; line-height: 40px; font-weight: 700; }
+.sheet .meta { font-family: var(--f-mono); font-size: 12px; color: var(--muted); line-height: 30px; display: flex; gap: 10px; flex-wrap: wrap; }
+.blk { margin: 0; min-height: var(--line-h); overflow-wrap: anywhere; }
+.task { display: grid; grid-template-columns: 30px 1fr auto; align-items: start; gap: 8px; }
+.check {
+  margin-top: 7px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--ink-2);
+  background: var(--paper); display: grid; place-items: center; padding: 0; cursor: pointer;
+}
+.check svg { width: 16px; height: 16px; opacity: 0; }
+.task.done .check { background: var(--ok); border-color: var(--ok); color: #fff; }
+.task.done .check svg { opacity: 1; }
+.task.done .t { color: var(--ink-2); }
+.state { font-size: 12px; line-height: 22px; margin-top: 7px; padding: 0 8px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); white-space: nowrap; }
+.task.done .state { background: var(--ok-soft); color: var(--ok); }
+.img { margin: 6px 0; }
+.img img { display: block; max-width: min(100%, 520px); border-radius: 6px; border: 1px solid var(--rule); }
+.interim { color: var(--muted); }
+.caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 1px; vertical-align: -0.18em; background: var(--accent); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+.ink { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.ink.passive { pointer-events: none; }
+
+.mini {
+  position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: 12px;
+  display: flex; gap: 4px; padding: 5px; border-radius: 14px;
+  background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 6px 20px rgba(22,34,58,.12);
+}
+.mini button { border: 0; background: transparent; border-radius: 10px; padding: 6px 9px; cursor: pointer; display: grid; justify-items: center; gap: 1px; color: var(--ink-2); }
+.mini button:hover { background: var(--desk); }
+.mini svg { width: 20px; height: 20px; }
+.mini span { font-size: 10px; }
+.hint {
+  position: absolute; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: var(--paper); font-size: 13px; padding: 8px 14px; border-radius: 999px;
+  max-width: calc(100% - 32px); text-align: center; pointer-events: none; transition: opacity .3s;
+}
+
+/* ---------- доска ---------- */
+.board-area { background: var(--paper); }
+.board-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+.zoom { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 4px 8px; }
+
+/* ---------- итоги (место для ИИ) ---------- */
+.sheet-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(420px, 100%);
+  background: var(--paper); border-left: 1px solid var(--rule); box-shadow: -10px 0 30px rgba(22,34,58,.10);
+  padding-block: 18px; padding-left: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px));
+  overflow: auto; display: grid; align-content: start; gap: 16px; z-index: 5;
+}
+.sheet-panel h3 { margin: 0; font-size: 18px; }
+.sheet-panel h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sheet-panel ul { margin: 0; padding-left: 20px; line-height: 1.5; }
+.sheet-panel .future { background: var(--desk); border-radius: 12px; padding: 12px; color: var(--ink-2); line-height: 1.5; font-size: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.btn { border: 1px solid var(--rule); background: var(--paper); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+</style>
+
+<div class="app">
+  <!-- ЕЖЕДНЕВНИК -->
+  <section class="view home" id="vHome">
+    <div class="home-in">
+      <div class="brand">
+        <h1>Free<i>Write</i></h1>
+        <span class="today" id="todayLabel"></span>
+      </div>
+      <div class="notice">
+        <b>Это макет дизайна, а не приложение.</b> Можно писать пером, пальцем или мышью и смотреть, как ведёт себя экран.
+        Распознавание здесь <b>имитируется</b>: вместо ваших слов подставляются слова из примера. Настоящее распознавание (Google ML Kit) работает только в Android-приложении.
+      </div>
+      <div class="starts">
+        <button class="start" id="newNote" type="button">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M14.5 4.5l5 5L9 20H4v-5z"/></svg></span>
+          <b>Новая запись</b>
+          <p>Совещание, планёрка, звонок. Пишете пером где угодно — слова сами собираются в текст у курсора.</p>
+        </button>
+        <button class="start" id="newBoard" type="button">
+          <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+          <b>Новая доска</b>
+          <p>Бесконечное поле: картинки, схемы, надписи и метки «сдано / не сдано». Пальцем двигаете и масштабируете.</p>
+        </button>
+      </div>
+      <div class="day">
+        <h2>Сегодня · примеры</h2>
+        <div class="list">
+          <button class="item" type="button" id="openSampleNote">
+            <time>08:30</time>
+            <span class="what"><b>Планёрка · секция 3</b><small>Запись · прораб, геодезия, подрядчик</small></span>
+            <span class="chips"><span class="chip ok">1 сдано</span><span class="chip bad">2 не сдано</span></span>
+          </button>
+          <button class="item" type="button" id="openSampleBoard">
+            <time>10:15</time>
+            <span class="what"><b>Секция 3 · приёмка работ</b><small>Доска · схема, фото, статусы</small></span>
+            <span class="chips"><span class="chip kind">доска</span></span>
+          </button>
+        </div>
+      </div>
+      <div class="how">
+        <div><b>Пером — пишете</b>В любом месте листа. Пауза — и надпись становится текстом.</div>
+        <div><b>Пальцем — листаете</b>Прокрутка, нажатие на галочку задачи, перенос курсора.</div>
+        <div><b>Без пера</b>На компьютере пишет мышь. На телефоне включите «Палец пишет».</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ЗАПИСЬ -->
+  <section class="view" id="vNote" hidden>
+    <div class="toolbar" id="noteBar"></div>
+    <div class="area" id="noteArea">
+      <div class="scroller" id="noteScroller"><article class="sheet" id="sheet"></article></div>
+      <canvas class="ink" id="noteInk"></canvas>
+      <div class="mini" id="mini">
+        <button type="button" data-act="space" title="Пробел"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 11v4h16v-4"/></svg><span>пробел</span></button>
+        <button type="button" data-act="back" title="Стереть слово"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11v12H9l-6-6z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/></svg><span>слово</span></button>
+        <button type="button" data-act="enter" title="Новая строка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5v7H6"/><path d="M10 8l-4 4 4 4"/></svg><span>строка</span></button>
+        <button type="button" data-act="task" title="Задача"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span>задача</span></button>
+      </div>
+      <div class="hint" id="noteHint"></div>
+      <aside class="sheet-panel" id="aiPanel" hidden></aside>
+    </div>
+  </section>
+
+  <!-- ДОСКА -->
+  <section class="view" id="vBoard" hidden>
+    <div class="toolbar" id="boardBar"></div>
+    <div class="area board-area" id="boardArea">
+      <canvas class="board-canvas" id="boardCanvas"></canvas>
+      <div class="zoom" id="zoomLabel">100%</div>
+      <div class="hint" id="boardHint"></div>
+    </div>
+  </section>
+  <input type="file" id="filePick" accept="image/*" hidden>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const CSSV = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COLORS = { ink: CSSV("--ink"), blue: CSSV("--pen-blue"), red: CSSV("--pen-red"), muted: CSSV("--muted"), accent: CSSV("--accent") };
+const FONT = '"Golos Text", "Segoe UI", Roboto, system-ui, sans-serif';
+
+/* ---------- имитация распознавания: слова из примера ---------- */
+const NOTE_WORDS = ["Геодезисты", "сдали", "исполнительную", "съёмку", "фундамента.", "Отметки", "по", "осям", "А–Г", "в", "допуске.", "Подрядчик", "до", "пятницы", "закрывает", "акты", "АОСР."];
+const BOARD_WORDS = ["Переснять", "колонну", "К-7", "отметка", "+12,450", "сдано", "проверить", "ось", "Б"];
+let noteWordIdx = 0, boardWordIdx = 0;
+
+/* ---------- общее ---------- */
+let fingerDraws = false;
+const svg = {
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  write: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h8M7 7v10"/><path d="M13.5 17.5l6-6 1.5 1.5-6 6H13.5z"/><path d="M12 12c1-2 2.5-2 3 0"/></svg>',
+  pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5l5 5L9 20H4v-5z"/><path d="M12.5 6.5l5 5"/></svg>',
+  marker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-3 3v2h4l3-3"/><path d="M9 15l7-7 3 3-7 7z"/><path d="M4 21h16"/></svg>',
+  eraser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h13"/><path d="M4.5 14.5l9-9 6 6-7.5 7.5H9z"/><path d="M9 10l6 6"/></svg>',
+  hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V5.5a1.5 1.5 0 013 0V11"/><path d="M11 10.5V4a1.5 1.5 0 013 0v7"/><path d="M14 10.5V5.5a1.5 1.5 0 013 0V14c0 4-2.5 7-6 7-2.5 0-4-1.2-5.5-3.5L3.8 14a1.5 1.5 0 012.5-1.6L8 14"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>',
+  redo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg>',
+  sum: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg>',
+  status: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="5"/><path d="M8 12l2 2 4-4"/></svg>',
+  fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'
+};
+
+function show(view) {
+  for (const id of ["vHome", "vNote", "vBoard"]) $("#" + id).hidden = id !== view;
+  if (view === "vNote") { resizeNoteInk(); renderNote(); }
+  if (view === "vBoard") { resizeBoard(); fitBoard(); }
+}
+function hint(id, text, ms = 2600) {
+  const h = $(id); h.textContent = text; h.style.opacity = "1";
+  clearTimeout(h._t); h._t = setTimeout(() => { h.style.opacity = "0"; }, ms);
+}
+const ruDate = (d) => d.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+const hhmm = (d) => d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+$("#todayLabel").textContent = ruDate(new Date());
+
+function buildBar(host, items) {
+  host.innerHTML = "";
+  for (const it of items) {
+    if (it === "|") { const s = document.createElement("span"); s.className = "sep"; host.appendChild(s); continue; }
+    if (it === "~") { const s = document.createElement("span"); s.className = "spacer"; host.appendChild(s); continue; }
+    if (it.node) { host.appendChild(it.node); continue; }
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tool" + (it.cls ? " " + it.cls : "");
+    b.innerHTML = svg[it.icon] + (it.label ? "<span>" + it.label + "</span>" : "");
+    b.title = it.title || it.label || "";
+    if (it.tool) b.dataset.tool = it.tool;
+    b.addEventListener("click", it.on);
+    host.appendChild(b);
+  }
+}
+function setPressed(host, attr, value) {
+  host.querySelectorAll("[data-" + attr + "]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+}
+function swatches(onPick, get) {
+  const wrap = document.createElement("span"); wrap.className = "swatches";
+  for (const [k, c] of [["ink", COLORS.ink], ["blue", COLORS.blue], ["red", COLORS.red]]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "sw"; b.style.background = c; b.dataset.color = k;
+    b.title = { ink: "Чёрный", blue: "Синий", red: "Красный" }[k];
+    b.addEventListener("click", () => { onPick(k); setPressed(wrap, "color", k); });
+    wrap.appendChild(b);
+  }
+  setPressed(wrap, "color", get());
+  return wrap;
+}
+function fingerToggle(id) {
+  const l = document.createElement("label"); l.className = "pill";
+  l.innerHTML = '<input type="checkbox" id="' + id + '"> Палец пишет';
+  const cb = l.querySelector("input"); cb.checked = fingerDraws;
+  cb.addEventListener("change", () => { fingerDraws = cb.checked; document.querySelectorAll(".pill input[type=checkbox]").forEach((x) => { x.checked = fingerDraws; }); });
+  return l;
+}
+function demoTag() {
+  const b = document.createElement("button"); b.type = "button"; b.className = "pill demo-tag"; b.textContent = "Макет · распознавание имитируется";
+  b.addEventListener("click", () => hint(document.querySelector("#vNote").hidden ? "#boardHint" : "#noteHint", "Слова берутся из примера. В приложении здесь будет Google ML Kit.", 3500));
+  return b;
+}
+
+/* ---------- рисование штрихов ---------- */
+function strokePath(ctx, s, alpha) {
+  const pts = s.pts; if (!pts.length) return;
+  ctx.save();
+  ctx.globalAlpha = alpha * (s.kind === "marker" ? 0.32 : 1);
+  ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, s.w * 0.6, 0, Math.PI * 2); ctx.fill(); ctx.restore(); return; }
+  if (s.straight) {
+    ctx.lineWidth = s.w; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+  } else if (s.kind === "marker" || !s.pressure) {
+    ctx.lineWidth = s.w; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) { const m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 }; ctx.quadraticCurveTo(pts[i].x, pts[i].y, m.x, m.y); }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y); ctx.stroke();
+  } else {
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      ctx.lineWidth = s.w * (0.45 + 1.1 * (a.p + b.p) / 2);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function bboxOf(strokes) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of strokes) for (const p of s.pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+}
+function farFrom(b, x, y) {
+  const pad = Math.max(60, b.h * 2.2);
+  return x < b.x - pad || x > b.x + b.w + pad || y < b.y - pad || y > b.y + b.h + pad;
+}
+function pointsOf(e) {
+  const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  return list.length ? list : [e];
+}
+
+/* =====================================================================
+   ЗАПИСЬ
+   ===================================================================== */
+const note = { title: "", meta: "", sample: false, blocks: [], caret: 0, drawings: [] };
+let noteTool = "write", noteColor = "ink";
+const noteHist = { undo: [], redo: [] };
+const notePending = { strokes: [], word: null, interimT: 0, commitT: 0 };
+let noteFading = [];
+
+function noteSnapshot() { return JSON.stringify({ blocks: note.blocks, caret: note.caret, drawings: note.drawings }); }
+function notePush() { noteHist.undo.push(noteSnapshot()); if (noteHist.undo.length > 60) noteHist.undo.shift(); noteHist.redo = []; }
+function noteRestore(json) { const d = JSON.parse(json); note.blocks = d.blocks; note.caret = d.caret; note.drawings = d.drawings; renderNote(); drawNoteInk(); }
+
+function openNote(sample) {
+  const now = new Date();
+  note.drawings = []; noteHist.undo = []; noteHist.redo = []; cancelNotePending();
+  if (sample) {
+    note.sample = true; note.title = "Планёрка · секция 3"; note.meta = "сегодня, 08:30 · пример";
+    note.blocks = [
+      { type: "p", text: "Прораб, геодезия, подрядчик «СтройМонтаж»." },
+      { type: "task", text: "Исполнительная съёмка фундамента, секция 3", done: true },
+      { type: "task", text: "Акты АОСР на армирование колонн 2 этажа", done: false },
+      { type: "task", text: "Переснять отметки перекрытия по оси Б", done: false },
+      { type: "p", text: "Следующая планёрка — понедельник, 08:30." },
+      { type: "p", text: "" }
+    ];
+  } else {
+    note.sample = false; note.title = "Совещание"; note.meta = ruDate(now) + ", " + hhmm(now);
+    note.blocks = [{ type: "p", text: "" }];
+  }
+  note.caret = note.blocks.length - 1;
+  $("#aiPanel").hidden = true;
+  buildNoteBar(); show("vNote"); $("#noteScroller").scrollTop = 0;
+  setTimeout(() => hint("#noteHint", "Пишите пером в любом месте листа — слова встанут у оранжевого курсора", 3800), 200);
+}
+
+function buildNoteBar() {
+  buildBar($("#noteBar"), [
+    { icon: "back", cls: "back", title: "К ежедневнику", on: () => { commitNotePending(); show("vHome"); } },
+    { node: (() => { const t = document.createElement("span"); t.className = "tb-title"; t.innerHTML = "<b></b><small></small>"; t.querySelector("b").textContent = note.title; t.querySelector("small").textContent = note.meta; return t; })() },
+    "|",
+    { icon: "write", label: "В текст", tool: "write", title: "Письмо в текст", on: () => setNoteTool("write") },
+    { icon: "pen", label: "Ручка", tool: "pen", title: "Ручка: рисунок остаётся рисунком", on: () => setNoteTool("pen") },
+    { icon: "marker", label: "Маркер", tool: "marker", on: () => setNoteTool("marker") },
+    { icon: "eraser", label: "Ластик", tool: "eraser", on: () => setNoteTool("eraser") },
+    { icon: "hand", label: "Указка", tool: "hand", title: "Нажимать и листать", on: () => setNoteTool("hand") },
+    { node: swatches((c) => { noteColor = c; }, () => noteColor) },
+    "|",
+    { icon: "image", label: "Картинка", on: () => pickImage("note") },
+    { icon: "undo", label: "Назад", on: () => { commitNotePending(); if (noteHist.undo.length) { noteHist.redo.push(noteSnapshot()); noteRestore(noteHist.undo.pop()); } } },
+    { icon: "redo", label: "Вперёд", on: () => { if (noteHist.redo.length) { noteHist.undo.push(noteSnapshot()); noteRestore(noteHist.redo.pop()); } } },
+    { icon: "sum", label: "Итоги", title: "Итоги и задачи (здесь будет ИИ)", on: toggleSummary },
+    "~",
+    { node: fingerToggle("fingerNote") },
+    { node: demoTag() }
+  ]);
+  setNoteTool(noteTool);
+}
+function setNoteTool(t) {
+  if (t !== "write") commitNotePending();
+  noteTool = t; setPressed($("#noteBar"), "tool", t);
+  $("#noteInk").classList.toggle("passive", t === "hand");
+  $("#mini").hidden = t !== "write";
+}
+
+/* --- текст --- */
+function joinWord(text, word) {
+  if (!text) return word;
+  if (/^[.,!?;:)»…]/.test(word) || /\s$/.test(text)) return text + word;
+  return text + " " + word;
+}
+function caretBlock() {
+  let b = note.blocks[note.caret];
+  if (!b || b.type === "img") { note.blocks.splice(note.caret + 1, 0, { type: "p", text: "" }); note.caret += 1; b = note.blocks[note.caret]; }
+  return b;
+}
+function renderNote() {
+  const sh = $("#sheet"); sh.innerHTML = "";
+  const h = document.createElement("h1"); h.className = "title"; h.textContent = note.title; sh.appendChild(h);
+  const m = document.createElement("div"); m.className = "meta"; m.textContent = note.meta; sh.appendChild(m);
+  note.blocks.forEach((b, i) => {
+    let node, target;
+    if (b.type === "p") { node = document.createElement("p"); node.className = "blk p"; node.textContent = b.text; target = node; }
+    else if (b.type === "task") {
+      node = document.createElement("div"); node.className = "blk task" + (b.done ? " done" : "");
+      node.innerHTML = '<button type="button" class="check" aria-label="Отметить: сдано">' + svg.check + '</button><span class="t"></span><span class="state"></span>';
+      node.querySelector(".t").textContent = b.text;
+      node.querySelector(".state").textContent = b.done ? "сдано" : "не сдано";
+      node.querySelector(".check").setAttribute("aria-pressed", String(!!b.done));
+      target = node.querySelector(".t");
+    } else { node = document.createElement("figure"); node.className = "blk img"; const im = new Image(); im.src = b.src; im.alt = "Вставленная картинка"; node.appendChild(im); }
+    node.dataset.i = String(i);
+    if (i === note.caret && target) {
+      const it = document.createElement("span"); it.className = "interim"; target.appendChild(it);
+      const c = document.createElement("span"); c.className = "caret"; target.appendChild(c);
+    }
+    sh.appendChild(node);
+  });
+}
+function setInterim(text) { const it = $("#sheet .interim"); if (it) it.textContent = text; }
+
+/* --- задачи, курсор, мини-панель --- */
+function sheetTap(target) {
+  const chk = target && target.closest && target.closest(".check");
+  const blk = target && target.closest && target.closest(".blk");
+  if (chk && blk) { notePush(); const b = note.blocks[+blk.dataset.i]; b.done = !b.done; renderNote(); return true; }
+  if (blk) { commitNotePending(); note.caret = +blk.dataset.i; renderNote(); return true; }
+  return false;
+}
+$("#sheet").addEventListener("click", (e) => { if (noteTool === "hand") sheetTap(e.target); });
+$("#mini").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  commitNotePending(); notePush();
+  const act = b.dataset.act; const cur = caretBlock();
+  if (act === "space") { cur.text = cur.text + " "; }
+  if (act === "back") {
+    if (cur.text.trim()) cur.text = cur.text.replace(/\s*\S+\s*$/, "");
+    else if (note.blocks.length > 1) { note.blocks.splice(note.caret, 1); note.caret = Math.max(0, note.caret - 1); }
+  }
+  if (act === "enter") { note.blocks.splice(note.caret + 1, 0, { type: "p", text: "" }); note.caret += 1; }
+  if (act === "task") {
+    if (cur.type === "p" && !cur.text) { note.blocks[note.caret] = { type: "task", text: "", done: false }; }
+    else { note.blocks.splice(note.caret + 1, 0, { type: "task", text: "", done: false }); note.caret += 1; }
+  }
+  renderNote();
+});
+
+/* --- холст поверх листа --- */
+const noteInk = $("#noteInk"); const nctx = noteInk.getContext("2d");
+let noteDpr = 1;
+function resizeNoteInk() {
+  const r = $("#noteArea").getBoundingClientRect(); noteDpr = Math.min(window.devicePixelRatio || 1, 2);
+  noteInk.width = Math.max(1, Math.round(r.width * noteDpr)); noteInk.height = Math.max(1, Math.round(r.height * noteDpr));
+  drawNoteInk();
+}
+function sheetOffset() { const a = $("#noteArea").getBoundingClientRect(), s = $("#sheet").getBoundingClientRect(); return { x: s.left - a.left, y: s.top - a.top, ax: a.left, ay: a.top, sx: s.left, sy: s.top }; }
+let noteRaf = 0;
+function drawNoteInk() {
+  noteRaf = 0;
+  nctx.setTransform(noteDpr, 0, 0, noteDpr, 0, 0); nctx.clearRect(0, 0, noteInk.width, noteInk.height);
+  const o = sheetOffset(); nctx.translate(o.x, o.y);
+  for (const s of note.drawings) strokePath(nctx, s, 1);
+  for (const s of notePending.strokes) strokePath(nctx, s, 1);
+  if (curStroke && curStroke.layer === "note") strokePath(nctx, curStroke.s, 1);
+  const now = performance.now();
+  noteFading = noteFading.filter((f) => now - f.t0 < 320);
+  for (const f of noteFading) for (const s of f.strokes) strokePath(nctx, s, 1 - (now - f.t0) / 320);
+  if (noteFading.length) scheduleNoteInk();
+}
+function scheduleNoteInk() { if (!noteRaf) noteRaf = requestAnimationFrame(drawNoteInk); }
+$("#noteScroller").addEventListener("scroll", scheduleNoteInk, { passive: true });
+noteInk.addEventListener("wheel", (e) => { $("#noteScroller").scrollBy(0, e.deltaY); e.preventDefault(); }, { passive: false });
+
+let curStroke = null;
+const noteTouch = { id: null, y: 0, x0: 0, y0: 0, t0: 0, vy: 0, lt: 0, moved: false };
+function inkColor(c) { return COLORS[c] || COLORS.ink; }
+function underInk(x, y) { noteInk.classList.add("passive"); const t = document.elementFromPoint(x, y); noteInk.classList.toggle("passive", noteTool === "hand"); return t; }
+
+noteInk.addEventListener("pointerdown", (e) => {
+  if (e.button > 0) return;
+  noteInk.setPointerCapture(e.pointerId);
+  const isFinger = e.pointerType === "touch" && !fingerDraws;
+  if (isFinger) { Object.assign(noteTouch, { id: e.pointerId, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), vy: 0, lt: performance.now(), moved: false }); cancelFling(); return; }
+  const o = sheetOffset(); const x = e.clientX - o.sx, y = e.clientY - o.sy;
+  const p = e.pointerType === "pen" ? (e.pressure || 0.5) : 0.5;
+  if (noteTool === "eraser") { notePush(); eraseNoteAt(x, y); curStroke = { layer: "erase", id: e.pointerId }; return; }
+  if (noteTool === "write") {
+    clearTimeout(notePending.interimT); clearTimeout(notePending.commitT);
+    if (notePending.strokes.length && farFrom(bboxOf(notePending.strokes), x, y)) commitNotePending();
+  }
+  const w = noteTool === "marker" ? 18 : 2.6;
+  const color = noteTool === "write" ? COLORS.ink : inkColor(noteColor);
+  curStroke = { layer: "note", id: e.pointerId, t0: performance.now(), x0: e.clientX, y0: e.clientY, s: { kind: noteTool === "marker" ? "marker" : "pen", color, w, pressure: e.pointerType === "pen", pts: [{ x, y, p }] } };
+  scheduleNoteInk();
+});
+noteInk.addEventListener("pointermove", (e) => {
+  if (noteTouch.id === e.pointerId) {
+    const now = performance.now(); const dy = e.clientY - noteTouch.y;
+    $("#noteScroller").scrollTop -= dy; noteTouch.vy = dy / Math.max(1, now - noteTouch.lt); noteTouch.lt = now; noteTouch.y = e.clientY;
+    if (Math.abs(e.clientY - noteTouch.y0) + Math.abs(e.clientX - noteTouch.x0) > 8) noteTouch.moved = true;
+    return;
+  }
+  if (!curStroke || curStroke.id !== e.pointerId) return;
+  const o = sheetOffset();
+  if (curStroke.layer === "erase") { eraseNoteAt(e.clientX - o.sx, e.clientY - o.sy); return; }
+  for (const ev of pointsOf(e)) curStroke.s.pts.push({ x: ev.clientX - o.sx, y: ev.clientY - o.sy, p: e.pointerType === "pen" ? (ev.pressure || 0.5) : 0.5 });
+  scheduleNoteInk();
+});
+function endNotePointer(e) {
+  if (noteTouch.id === e.pointerId) {
+    noteTouch.id = null;
+    if (!noteTouch.moved && performance.now() - noteTouch.t0 < 450) sheetTap(underInk(e.clientX, e.clientY));
+    else startFling(noteTouch.vy);
+    return;
+  }
+  if (!curStroke || curStroke.id !== e.pointerId) return;
+  const cs = curStroke; curStroke = null;
+  if (cs.layer === "erase") return;
+  const tap = cs.s.pts.length <= 3 && performance.now() - cs.t0 < 300 && Math.hypot(e.clientX - cs.x0, e.clientY - cs.y0) < 5;
+  if (tap) { const t = underInk(e.clientX, e.clientY); if (t && t.closest && t.closest(".check")) { sheetTap(t); scheduleNoteInk(); return; } }
+  if (noteTool === "write") {
+    notePending.strokes.push(cs.s);
+    notePending.interimT = setTimeout(showNoteInterim, 220);
+    notePending.commitT = setTimeout(commitNotePending, 1300);
+  } else { notePush(); note.drawings.push(cs.s); }
+  scheduleNoteInk();
+}
+noteInk.addEventListener("pointerup", endNotePointer);
+noteInk.addEventListener("pointercancel", (e) => { if (curStroke && curStroke.id === e.pointerId) curStroke = null; if (noteTouch.id === e.pointerId) noteTouch.id = null; scheduleNoteInk(); });
+
+let flingRaf = 0;
+function cancelFling() { cancelAnimationFrame(flingRaf); flingRaf = 0; }
+function startFling(v) {
+  let vel = v * 16; if (Math.abs(vel) < 2) return;
+  const step = () => { $("#noteScroller").scrollTop -= vel; vel *= 0.94; if (Math.abs(vel) > 0.5) flingRaf = requestAnimationFrame(step); };
+  flingRaf = requestAnimationFrame(step);
+}
+function eraseNoteAt(x, y) {
+  const before = note.drawings.length;
+  note.drawings = note.drawings.filter((s) => !s.pts.some((p) => Math.hypot(p.x - x, p.y - y) < 14 + s.w / 2));
+  if (note.drawings.length !== before) scheduleNoteInk();
+}
+function showNoteInterim() {
+  if (!notePending.strokes.length) return;
+  if (!notePending.word) { notePending.word = NOTE_WORDS[noteWordIdx % NOTE_WORDS.length]; noteWordIdx++; }
+  const w = notePending.word; const n = notePending.strokes.length;
+  const shown = w.slice(0, clamp(Math.ceil(n * 1.8), 1, w.length));
+  const b = note.blocks[note.caret]; const needSpace = b && b.type !== "img" && b.text && !/\s$/.test(b.text) && !/^[.,!?;:]/.test(w);
+  setInterim((needSpace ? " " : "") + shown);
+}
+function commitNotePending() {
+  clearTimeout(notePending.interimT); clearTimeout(notePending.commitT);
+  if (!notePending.strokes.length) return;
+  const word = notePending.word || NOTE_WORDS[noteWordIdx++ % NOTE_WORDS.length];
+  notePush();
+  const b = caretBlock(); b.text = joinWord(b.text, word);
+  noteFading.push({ strokes: notePending.strokes, t0: performance.now() });
+  notePending.strokes = []; notePending.word = null;
+  renderNote(); scheduleNoteInk();
+}
+function cancelNotePending() { clearTimeout(notePending.interimT); clearTimeout(notePending.commitT); notePending.strokes = []; notePending.word = null; }
+
+/* --- итоги --- */
+function toggleSummary() {
+  const p = $("#aiPanel");
+  if (!p.hidden) { p.hidden = true; return; }
+  commitNotePending();
+  const tasks = note.blocks.filter((b) => b.type === "task" && b.text.trim());
+  const open = tasks.filter((t) => !t.done), done = tasks.filter((t) => t.done);
+  const li = (arr) => arr.length ? "<ul>" + arr.map((t) => "<li></li>").join("") + "</ul>" : "<p style=\"margin:0;color:var(--muted)\">нет</p>";
+  p.innerHTML = '<div class="row"><h3>Итоги записи</h3><button type="button" class="btn" id="aiClose">Закрыть</button></div>' +
+    "<div><h4>Не сдано · " + open.length + "</h4>" + li(open) + "</div>" +
+    "<div><h4>Сдано · " + done.length + "</h4>" + li(done) + "</div>" +
+    '<div class="future"><b>Здесь будет ИИ-помощник.</b> Кратко пересказать совещание, выписать задачи с ответственными и сроками, напомнить, что не сдано с прошлой планёрки. Для этого нужен интернет и сервис ИИ — подключим отдельным этапом.<br><br>Сейчас списки выше просто собраны из строк-задач этой записи.</div>' +
+    '<button type="button" class="btn primary" id="aiCopy">Скопировать задачи</button>';
+  const lis = p.querySelectorAll("li"); [...open, ...done].forEach((t, i) => { if (lis[i]) lis[i].textContent = t.text; });
+  p.hidden = false;
+  $("#aiClose").addEventListener("click", () => { p.hidden = true; });
+  $("#aiCopy").addEventListener("click", () => {
+    const text = "Не сдано:\n" + open.map((t) => "— " + t.text).join("\n") + "\n\nСдано:\n" + done.map((t) => "— " + t.text).join("\n");
+    const ok = () => hint("#noteHint", "Задачи скопированы"); const fail = () => hint("#noteHint", "Копирование недоступно в этом окне");
+    try { navigator.clipboard.writeText(text).then(ok, fail); } catch (_) { fail(); }
+  });
+}
+
+/* =====================================================================
+   ДОСКА
+   ===================================================================== */
+const board = { strokes: [], texts: [], images: [], stickers: [] };
+const cam = { x: 0, y: 0, z: 1 };
+const imgCache = new Map();
+let boardTool = "pen", boardColor = "ink";
+const boardHist = { undo: [], redo: [] };
+const boardPending = { strokes: [], word: null, interimT: 0, commitT: 0 };
+let boardFading = [];
+const bc = $("#boardCanvas"); const bctx = bc.getContext("2d");
+let bDpr = 1, bW = 1, bH = 1;
+const STATUS = {
+  bad: { label: "Не сдано", fg: CSSV("--bad"), bg: CSSV("--bad-soft") },
+  warn: { label: "В работе", fg: CSSV("--warn"), bg: CSSV("--warn-soft") },
+  ok: { label: "Сдано", fg: CSSV("--ok"), bg: CSSV("--ok-soft") }
+};
+const NEXT = { bad: "warn", warn: "ok", ok: "bad" };
+
+function boardSnapshot() { return JSON.stringify(board); }
+function boardPush() { boardHist.undo.push(boardSnapshot()); if (boardHist.undo.length > 60) boardHist.undo.shift(); boardHist.redo = []; }
+function boardRestore(json) { Object.assign(board, JSON.parse(json)); board.images.forEach(cacheImg); drawBoard(); }
+function cacheImg(im) { if (!imgCache.has(im.id)) { const i = new Image(); i.onload = scheduleBoard; i.src = im.src; imgCache.set(im.id, i); } }
+
+function samplePhoto() {
+  const c = document.createElement("canvas"); c.width = 640; c.height = 440; const g = c.getContext("2d");
+  const sky = g.createLinearGradient(0, 0, 0, 300); sky.addColorStop(0, "#9DB9D6"); sky.addColorStop(1, "#DCE6EF"); g.fillStyle = sky; g.fillRect(0, 0, 640, 440);
+  g.fillStyle = "#8B8172"; g.fillRect(0, 300, 640, 140);
+  g.fillStyle = "#B9B2A6"; for (let i = 0; i < 6; i++) g.fillRect(70 + i * 90, 170, 26, 130);
+  g.fillStyle = "#C9A15A"; g.fillRect(50, 150, 540, 22);
+  g.strokeStyle = "#4A4F57"; g.lineWidth = 5; g.beginPath(); g.moveTo(560, 300); g.lineTo(560, 40); g.lineTo(380, 40); g.moveTo(560, 70); g.lineTo(600, 40); g.stroke();
+  g.fillStyle = "rgba(22,34,58,.72)"; g.fillRect(0, 392, 640, 48); g.fillStyle = "#fff"; g.font = "600 22px " + FONT; g.fillText("Пример: фото с объекта", 18, 424);
+  return c.toDataURL("image/jpeg", 0.82);
+}
+function rectStroke(x, y, w, h) { return { kind: "pen", straight: true, color: COLORS.ink, w: 3, pressure: false, pts: [{ x, y, p: .5 }, { x: x + w, y, p: .5 }, { x: x + w, y: y + h, p: .5 }, { x, y: y + h, p: .5 }, { x, y, p: .5 }] }; }
+function line(x0, y0, x1, y1, color, w) { return { kind: "pen", straight: true, color: color || COLORS.muted, w: w || 1.5, pressure: false, pts: [{ x: x0, y: y0, p: .5 }, { x: x1, y: y1, p: .5 }] }; }
+
+function openBoard(sample) {
+  board.strokes = []; board.texts = []; board.images = []; board.stickers = [];
+  boardHist.undo = []; boardHist.redo = []; cancelBoardPending();
+  if (sample) {
+    const t = (x, y, size, text, color) => board.texts.push({ x, y, size, text, color: color || COLORS.ink });
+    t(40, 40, 34, "Секция 3 · приёмка работ"); t(40, 78, 16, "пример доски", COLORS.muted);
+    board.strokes.push(rectStroke(80, 140, 600, 360));
+    [80, 280, 480, 680].forEach((x, i) => { board.strokes.push(line(x, 110, x, 530)); t(x - 6, 104, 18, String(i + 1), COLORS.muted); });
+    [140, 320, 500].forEach((y, i) => { board.strokes.push(line(50, y, 710, y)); t(28, y + 6, 18, "АБВ"[i], COLORS.muted); });
+    t(100, 230, 22, "Фундамент"); t(300, 230, 22, "Колонны 2 эт."); t(500, 410, 22, "Перекрытие");
+    board.stickers.push({ x: 100, y: 250, s: "ok" }, { x: 300, y: 250, s: "warn" }, { x: 500, y: 430, s: "bad" });
+    board.images.push({ id: "sample-photo", x: 760, y: 140, w: 384, h: 264, src: samplePhoto() });
+    t(760, 436, 18, "Опалубка, 06.11 · ось 3–4", COLORS.ink2 || COLORS.muted);
+    board.strokes.push({ kind: "pen", color: COLORS.red, w: 3, pressure: false, pts: [{ x: 750, y: 300, p: .5 }, { x: 700, y: 360, p: .5 }, { x: 640, y: 395, p: .5 }] });
+    board.strokes.push({ kind: "pen", color: COLORS.red, w: 3, pressure: false, pts: [{ x: 652, y: 378, p: .5 }, { x: 640, y: 395, p: .5 }, { x: 660, y: 398, p: .5 }] });
+    t(770, 480, 20, "Перекрытие: переснять отметки по оси Б", COLORS.red);
+    board.images.forEach(cacheImg);
+  }
+  buildBoardBar(); show("vBoard");
+  setTimeout(() => hint("#boardHint", "Пальцем — двигать и масштабировать, пером — писать и рисовать", 3800), 200);
+}
+function buildBoardBar() {
+  buildBar($("#boardBar"), [
+    { icon: "back", cls: "back", title: "К ежедневнику", on: () => { commitBoardPending(); show("vHome"); } },
+    { node: (() => { const t = document.createElement("span"); t.className = "tb-title"; t.innerHTML = "<b>Доска</b><small>бесконечное поле</small>"; return t; })() },
+    "|",
+    { icon: "write", label: "В текст", tool: "write", on: () => setBoardTool("write") },
+    { icon: "pen", label: "Ручка", tool: "pen", on: () => setBoardTool("pen") },
+    { icon: "marker", label: "Маркер", tool: "marker", on: () => setBoardTool("marker") },
+    { icon: "eraser", label: "Ластик", tool: "eraser", on: () => setBoardTool("eraser") },
+    { icon: "hand", label: "Рука", tool: "hand", title: "Двигать доску и предметы", on: () => setBoardTool("hand") },
+    { icon: "status", label: "Статус", tool: "status", title: "Метка: не сдано → в работе → сдано", on: () => setBoardTool("status") },
+    { node: swatches((c) => { boardColor = c; }, () => boardColor) },
+    "|",
+    { icon: "image", label: "Картинка", on: () => pickImage("board") },
+    { icon: "undo", label: "Назад", on: () => { commitBoardPending(); if (boardHist.undo.length) { boardHist.redo.push(boardSnapshot()); boardRestore(boardHist.undo.pop()); } } },
+    { icon: "redo", label: "Вперёд", on: () => { if (boardHist.redo.length) { boardHist.undo.push(boardSnapshot()); boardRestore(boardHist.redo.pop()); } } },
+    { icon: "fit", label: "Всё", title: "Показать всю доску", on: fitBoard },
+    "~",
+    { node: fingerToggle("fingerBoard") },
+    { node: demoTag() }
+  ]);
+  setBoardTool(boardTool);
+}
+function setBoardTool(t) { if (t !== "write") commitBoardPending(); boardTool = t; setPressed($("#boardBar"), "tool", t); }
+
+function resizeBoard() {
+  const r = $("#boardArea").getBoundingClientRect(); bDpr = Math.min(window.devicePixelRatio || 1, 2);
+  bW = Math.max(1, r.width); bH = Math.max(1, r.height);
+  bc.width = Math.round(bW * bDpr); bc.height = Math.round(bH * bDpr); drawBoard();
+}
+const toWorld = (sx, sy) => ({ x: sx / cam.z + cam.x, y: sy / cam.z + cam.y });
+function localXY(e) { const r = bc.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function textWidth(t) { bctx.save(); bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.font = "500 " + t.size + "px " + FONT; const w = bctx.measureText(t.text).width; bctx.restore(); return w; }
+function stickerBox(s) { return { x: s.x, y: s.y, w: 116, h: 34 }; }
+
+let bRaf = 0;
+function scheduleBoard() { if (!bRaf) bRaf = requestAnimationFrame(drawBoard); }
+function drawBoard() {
+  bRaf = 0;
+  const g = bctx; g.setTransform(bDpr, 0, 0, bDpr, 0, 0); g.clearRect(0, 0, bW, bH);
+  // сетка
+  const step = 40; const tl = toWorld(0, 0), br = toWorld(bW, bH);
+  g.save(); g.setTransform(bDpr * cam.z, 0, 0, bDpr * cam.z, -cam.x * cam.z * bDpr, -cam.y * cam.z * bDpr);
+  if (cam.z > 0.35) {
+    g.strokeStyle = "rgba(40,80,140,0.07)"; g.lineWidth = 1 / cam.z; g.beginPath();
+    for (let x = Math.floor(tl.x / step) * step; x < br.x; x += step) { g.moveTo(x, tl.y); g.lineTo(x, br.y); }
+    for (let y = Math.floor(tl.y / step) * step; y < br.y; y += step) { g.moveTo(tl.x, y); g.lineTo(br.x, y); }
+    g.stroke();
+  }
+  for (const im of board.images) {
+    const i = imgCache.get(im.id);
+    g.fillStyle = "#fff"; g.fillRect(im.x - 6, im.y - 6, im.w + 12, im.h + 12);
+    g.strokeStyle = "rgba(22,34,58,.18)"; g.lineWidth = 1 / cam.z; g.strokeRect(im.x - 6, im.y - 6, im.w + 12, im.h + 12);
+    if (i && i.complete && i.naturalWidth) g.drawImage(i, im.x, im.y, im.w, im.h);
+  }
+  for (const s of board.strokes) strokePath(g, s, 1);
+  for (const t of board.texts) { g.fillStyle = t.color; g.font = "500 " + t.size + "px " + FONT; g.textBaseline = "alphabetic"; g.fillText(t.text, t.x, t.y); }
+  for (const st of board.stickers) {
+    const b = stickerBox(st), c = STATUS[st.s];
+    g.fillStyle = c.bg; roundRect(g, b.x, b.y, b.w, b.h, 17); g.fill();
+    g.strokeStyle = c.fg; g.lineWidth = 1.5; roundRect(g, b.x, b.y, b.w, b.h, 17); g.stroke();
+    g.fillStyle = c.fg; g.font = "600 15px " + FONT; g.textBaseline = "middle"; g.fillText(c.label, b.x + 16, b.y + b.h / 2 + 1); g.textBaseline = "alphabetic";
+  }
+  for (const s of boardPending.strokes) strokePath(g, s, 1);
+  if (bCur && bCur.s) strokePath(g, bCur.s, 1);
+  if (boardPending.strokes.length && boardPending.shown) {
+    const bb = bboxOf(boardPending.strokes); g.fillStyle = COLORS.muted; g.font = "500 " + clamp(bb.h * 0.8, 16, 120) + "px " + FONT;
+    g.fillText(boardPending.shown, bb.x, bb.y - 8);
+  }
+  const now = performance.now(); boardFading = boardFading.filter((f) => now - f.t0 < 320);
+  for (const f of boardFading) for (const s of f.strokes) strokePath(g, s, 1 - (now - f.t0) / 320);
+  g.restore();
+  $("#zoomLabel").textContent = Math.round(cam.z * 100) + "%";
+  if (boardFading.length) scheduleBoard();
+}
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+function fitBoard() {
+  const xs = [], ys = [];
+  const add = (x, y) => { xs.push(x); ys.push(y); };
+  board.strokes.forEach((s) => s.pts.forEach((p) => add(p.x, p.y)));
+  board.texts.forEach((t) => { add(t.x, t.y - t.size); add(t.x + textWidth(t), t.y); });
+  board.images.forEach((i) => { add(i.x, i.y); add(i.x + i.w, i.y + i.h); });
+  board.stickers.forEach((s) => { add(s.x, s.y); add(s.x + 116, s.y + 34); });
+  if (!xs.length) { cam.x = -bW / 2; cam.y = -bH / 2; cam.z = 1; drawBoard(); return; }
+  const x0 = Math.min(...xs) - 40, x1 = Math.max(...xs) + 40, y0 = Math.min(...ys) - 40, y1 = Math.max(...ys) + 40;
+  cam.z = clamp(Math.min(bW / (x1 - x0), bH / (y1 - y0)), 0.2, 2);
+  cam.x = x0 - (bW / cam.z - (x1 - x0)) / 2; cam.y = y0 - (bH / cam.z - (y1 - y0)) / 2;
+  drawBoard();
+}
+function zoomAt(sx, sy, f) { const w = toWorld(sx, sy); cam.z = clamp(cam.z * f, 0.2, 4); cam.x = w.x - sx / cam.z; cam.y = w.y - sy / cam.z; scheduleBoard(); }
+bc.addEventListener("wheel", (e) => {
+  e.preventDefault(); const p = localXY(e);
+  if (e.ctrlKey || e.metaKey) zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+  else { cam.x += e.deltaX / cam.z; cam.y += e.deltaY / cam.z; scheduleBoard(); }
+}, { passive: false });
+
+function hitObject(w) {
+  for (let i = board.stickers.length - 1; i >= 0; i--) { const b = stickerBox(board.stickers[i]); if (w.x >= b.x && w.x <= b.x + b.w && w.y >= b.y && w.y <= b.y + b.h) return { kind: "stickers", i }; }
+  for (let i = board.texts.length - 1; i >= 0; i--) { const t = board.texts[i]; if (w.x >= t.x && w.x <= t.x + textWidth(t) && w.y >= t.y - t.size && w.y <= t.y + t.size * 0.3) return { kind: "texts", i }; }
+  for (let i = board.images.length - 1; i >= 0; i--) { const m = board.images[i]; if (w.x >= m.x && w.x <= m.x + m.w && w.y >= m.y && w.y <= m.y + m.h) return { kind: "images", i }; }
+  return null;
+}
+function eraseBoardAt(w) {
+  const r = 12 / cam.z; let changed = false;
+  const nS = board.strokes.filter((s) => !s.pts.some((p) => Math.hypot(p.x - w.x, p.y - w.y) < r + s.w / 2)); if (nS.length !== board.strokes.length) { board.strokes = nS; changed = true; }
+  const h = hitObject(w); if (h && h.kind !== "images") { board[h.kind].splice(h.i, 1); changed = true; }
+  if (changed) scheduleBoard();
+}
+
+const bPtrs = new Map();
+let bCur = null, pan = null, pinch = null, drag = null;
+bc.addEventListener("pointerdown", (e) => {
+  if (e.button > 0) return;
+  bc.setPointerCapture(e.pointerId);
+  const p = localXY(e); bPtrs.set(e.pointerId, { x: p.x, y: p.y, type: e.pointerType });
+  const fingers = [...bPtrs.values()].filter((q) => q.type === "touch");
+  if (fingers.length >= 2) {
+    if (bCur && bCur.touch) bCur = null; pan = null; drag = null;
+    const [a, b] = fingers; const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: cam.z, w: toWorld(mid.x, mid.y) };
+    return;
+  }
+  const w = toWorld(p.x, p.y);
+  const drawing = (e.pointerType !== "touch" || fingerDraws) && boardTool !== "hand";
+  if (!drawing) {
+    const h = boardTool === "hand" ? hitObject(w) : null;
+    if (h) { boardPush(); drag = { id: e.pointerId, h, last: w }; }
+    else pan = { id: e.pointerId, x: p.x, y: p.y };
+    return;
+  }
+  if (boardTool === "status") {
+    const h = hitObject(w); boardPush();
+    if (h && h.kind === "stickers") board.stickers[h.i].s = NEXT[board.stickers[h.i].s];
+    else board.stickers.push({ x: w.x - 58, y: w.y - 17, s: "bad" });
+    scheduleBoard(); return;
+  }
+  if (boardTool === "eraser") { boardPush(); bCur = { id: e.pointerId, erase: true }; eraseBoardAt(w); return; }
+  if (boardTool === "write") {
+    clearTimeout(boardPending.interimT); clearTimeout(boardPending.commitT);
+    if (boardPending.strokes.length && farFrom(bboxOf(boardPending.strokes), w.x, w.y)) commitBoardPending();
+  }
+  const pr = e.pointerType === "pen" ? (e.pressure || 0.5) : 0.5;
+  bCur = { id: e.pointerId, touch: e.pointerType === "touch", s: { kind: boardTool === "marker" ? "marker" : "pen", color: boardTool === "write" ? COLORS.ink : inkColor(boardColor), w: (boardTool === "marker" ? 18 : 2.8) / cam.z, pressure: e.pointerType === "pen", pts: [{ x: w.x, y: w.y, p: pr }] } };
+  scheduleBoard();
+});
+bc.addEventListener("pointermove", (e) => {
+  const p = localXY(e); const q = bPtrs.get(e.pointerId); if (q) { q.x = p.x; q.y = p.y; }
+  if (pinch) {
+    const fingers = [...bPtrs.values()].filter((v) => v.type === "touch"); if (fingers.length < 2) return;
+    const [a, b] = fingers; const d = Math.hypot(a.x - b.x, a.y - b.y); const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    cam.z = clamp(pinch.z0 * d / pinch.d0, 0.2, 4); cam.x = pinch.w.x - mid.x / cam.z; cam.y = pinch.w.y - mid.y / cam.z; scheduleBoard(); return;
+  }
+  if (pan && pan.id === e.pointerId) { cam.x -= (p.x - pan.x) / cam.z; cam.y -= (p.y - pan.y) / cam.z; pan.x = p.x; pan.y = p.y; scheduleBoard(); return; }
+  if (drag && drag.id === e.pointerId) {
+    const w = toWorld(p.x, p.y); const o = board[drag.h.kind][drag.h.i]; o.x += w.x - drag.last.x; o.y += w.y - drag.last.y; drag.last = w; scheduleBoard(); return;
+  }
+  if (!bCur || bCur.id !== e.pointerId) return;
+  if (bCur.erase) { eraseBoardAt(toWorld(p.x, p.y)); return; }
+  const r = bc.getBoundingClientRect();
+  for (const ev of pointsOf(e)) { const w = toWorld(ev.clientX - r.left, ev.clientY - r.top); bCur.s.pts.push({ x: w.x, y: w.y, p: e.pointerType === "pen" ? (ev.pressure || 0.5) : 0.5 }); }
+  scheduleBoard();
+});
+function endBoardPointer(e) {
+  bPtrs.delete(e.pointerId);
+  if (pinch && [...bPtrs.values()].filter((v) => v.type === "touch").length < 2) pinch = null;
+  if (pan && pan.id === e.pointerId) pan = null;
+  if (drag && drag.id === e.pointerId) drag = null;
+  if (!bCur || bCur.id !== e.pointerId) return;
+  const cur = bCur; bCur = null;
+  if (cur.erase || e.type === "pointercancel") { scheduleBoard(); return; }
+  if (boardTool === "write") {
+    boardPending.strokes.push(cur.s);
+    boardPending.interimT = setTimeout(showBoardInterim, 220);
+    boardPending.commitT = setTimeout(commitBoardPending, 1300);
+  } else { boardPush(); board.strokes.push(cur.s); }
+  scheduleBoard();
+}
+bc.addEventListener("pointerup", endBoardPointer);
+bc.addEventListener("pointercancel", endBoardPointer);
+
+function showBoardInterim() {
+  if (!boardPending.strokes.length) return;
+  if (!boardPending.word) { boardPending.word = BOARD_WORDS[boardWordIdx % BOARD_WORDS.length]; boardWordIdx++; }
+  const w = boardPending.word; boardPending.shown = w.slice(0, clamp(Math.ceil(boardPending.strokes.length * 1.8), 1, w.length)); scheduleBoard();
+}
+function commitBoardPending() {
+  clearTimeout(boardPending.interimT); clearTimeout(boardPending.commitT);
+  if (!boardPending.strokes.length) return;
+  const word = boardPending.word || BOARD_WORDS[boardWordIdx++ % BOARD_WORDS.length];
+  const bb = bboxOf(boardPending.strokes); boardPush();
+  const size = clamp(bb.h * 0.8, 14, 160);
+  board.texts.push({ x: bb.x, y: bb.y + bb.h * 0.5 + size * 0.35, size, text: word, color: COLORS.ink });
+  boardFading.push({ strokes: boardPending.strokes, t0: performance.now() });
+  boardPending.strokes = []; boardPending.word = null; boardPending.shown = "";
+  scheduleBoard();
+}
+function cancelBoardPending() { clearTimeout(boardPending.interimT); clearTimeout(boardPending.commitT); boardPending.strokes = []; boardPending.word = null; boardPending.shown = ""; }
+
+/* ---------- картинки ---------- */
+let pickTarget = "note";
+function pickImage(target) { pickTarget = target; $("#filePick").value = ""; $("#filePick").click(); }
+$("#filePick").addEventListener("change", () => {
+  const f = $("#filePick").files && $("#filePick").files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const src = String(fr.result);
+    if (pickTarget === "note") {
+      commitNotePending(); notePush();
+      note.blocks.splice(note.caret + 1, 0, { type: "img", src }, { type: "p", text: "" }); note.caret += 2; renderNote(); scheduleNoteInk();
+    } else {
+      const probe = new Image();
+      probe.onload = () => {
+        const maxW = 420 / cam.z; const k = Math.min(1, maxW / probe.naturalWidth); const w = probe.naturalWidth * k, h = probe.naturalHeight * k;
+        const c = toWorld(bW / 2, bH / 2); boardPush();
+        const im = { id: "img" + Date.now(), x: c.x - w / 2, y: c.y - h / 2, w, h, src }; board.images.push(im); cacheImg(im); scheduleBoard();
+        hint("#boardHint", "Картинку можно двигать инструментом «Рука»");
+      };
+      probe.src = src;
+    }
+  };
+  fr.readAsDataURL(f);
+});
+
+/* ---------- навигация и размеры ---------- */
+$("#newNote").addEventListener("click", () => openNote(false));
+$("#openSampleNote").addEventListener("click", () => openNote(true));
+$("#newBoard").addEventListener("click", () => openBoard(false));
+$("#openSampleBoard").addEventListener("click", () => openBoard(true));
+new ResizeObserver(() => { if (!$("#vNote").hidden) resizeNoteInk(); }).observe($("#noteArea"));
+new ResizeObserver(() => { if (!$("#vBoard").hidden) resizeBoard(); }).observe($("#boardArea"));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { scheduleBoard(); });
+})();
+</script>
