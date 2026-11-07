@@ -274,14 +274,21 @@ class NoteActivity : Activity(), NoteInkView.Host {
             elevation = dp(6f).toFloat()
             setPadding(dp(4f), dp(4f), dp(4f), dp(4f))
         }
-        fun miniButton(icon: Int, label: String, action: () -> Unit) {
-            mini.addView(Ui.ToolButton(this, icon, label).apply {
+        fun miniButton(icon: Int, label: String, action: () -> Unit): Ui.ToolButton {
+            val b = Ui.ToolButton(this, icon, label).apply {
                 minimumWidth = dp(48f)
                 setOnClickListener { action() }
-            })
+            }
+            mini.addView(b)
+            return b
         }
-        miniButton(R.drawable.ic_space, "пробел") { runAfterCommit { editCaret { it + " " } } }
-        miniButton(R.drawable.ic_backspace, "слово") { runAfterCommit { deleteWord() } }
+        miniButton(R.drawable.ic_space, "пробел") { runAfterCommit { insertAtCaret(" ", raw = true) } }
+        // «буква»: одно нажатие — одна буква; если держать — стирает подряд, как клавиатура.
+        miniButton(R.drawable.ic_backspace, "буква") {}.apply {
+            tag = "mini_letter"
+            setOnTouchListener(repeatOnHold { runAfterCommit { deleteChar() } })
+        }
+        miniButton(R.drawable.ic_backspace_word, "слово") { runAfterCommit { deleteWord() } }
         miniButton(R.drawable.ic_enter, "строка") { runAfterCommit { newLine(task = false) } }
         miniButton(R.drawable.ic_task, "задача") { runAfterCommit { newLine(task = true) } }
         miniButton(R.drawable.ic_edit, "править") { runAfterCommit { editCaretDialog() } }
@@ -384,7 +391,7 @@ class NoteActivity : Activity(), NoteInkView.Host {
                 is Block.Para -> TextView(this).apply {
                     textStyle(this)
                     text = b.text
-                    setOnClickListener { setCaret(i) }
+                    caretOnTap(this, i)
                     if (i == note.caret) caretTextView = this
                 }
                 is Block.Task -> taskView(b, i)
@@ -426,7 +433,7 @@ class NoteActivity : Activity(), NoteInkView.Host {
             textStyle(this)
             text = b.text
             if (b.done) setTextColor(Ui.INK2)
-            setOnClickListener { setCaret(i) }
+            caretOnTap(this, i)
             if (i == note.caret) caretTextView = this
         }
         row.addView(text, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
@@ -465,24 +472,29 @@ class NoteActivity : Activity(), NoteInkView.Host {
         setOnLongClickListener { removeBlock(i); true }
     }
 
-    /** Текст текущей строки + серое промежуточное слово + мигающий курсор. */
+    /** Где в строке курсора показаны вставки (серое слово + курсор): позиция и длина. */
+    private var shownInsertAt = 0
+    private var shownInsertLen = 0
+
+    /** Текст текущей строки + серое промежуточное слово + мигающий курсор — в месте курсора. */
     private fun refreshCaretText() {
         val tv = caretTextView ?: return
         val b = note.blocks.getOrNull(note.caret) ?: return
-        val base = when (b) {
-            is Block.Para -> b.text
-            is Block.Task -> b.text
-            else -> return
-        }
-        val sb = SpannableStringBuilder(base)
+        val base = blockText(b) ?: return
+        val pos = caretPos(base)
+        val sb = SpannableStringBuilder(base.substring(0, pos))
         if (interim.isNotEmpty()) {
             val start = sb.length
-            sb.append(if (needsSpace(base, interim)) " " else "").append(interim)
+            val shown = spacedInsert(base.substring(0, pos), base.substring(pos), interim)
+            sb.append(shown)
             sb.setSpan(ForegroundColorSpan(Ui.MUTED), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         val c = sb.length
         sb.append("▏")
         sb.setSpan(ForegroundColorSpan(if (caretOn) Ui.ACCENT else Color.TRANSPARENT), c, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        shownInsertAt = pos
+        shownInsertLen = sb.length - pos
+        sb.append(base.substring(pos))
         tv.text = sb
     }
 
@@ -491,22 +503,95 @@ class NoteActivity : Activity(), NoteInkView.Host {
         return note.blocks.size - 1
     }
 
-    private fun setCaret(i: Int) {
+    /** Поставить курсор в строку i; offset — место внутри строки (-1 — в конец). */
+    private fun setCaret(i: Int, offset: Int = -1) {
         runAfterCommit {
             note.caret = i.coerceIn(0, note.blocks.size - 1)
+            val text = blockText(note.blocks[note.caret])
+            note.caretOffset = if (text == null || offset < 0 || offset >= text.length) -1 else offset
             interim = ""
             renderBlocks()
             changed(render = false)
         }
     }
 
+    /** Нажатие пальцем на строку ставит курсор в то место слова, куда нажали. */
+    private fun caretOnTap(tv: TextView, i: Int) {
+        val last = FloatArray(2)
+        tv.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) { last[0] = e.x; last[1] = e.y }
+            false
+        }
+        tv.setOnClickListener {
+            var off = tv.getOffsetForPosition(last[0], last[1])
+            if (i == note.caret && off > shownInsertAt) off = max(shownInsertAt, off - shownInsertLen)
+            setCaret(i, off)
+        }
+    }
+
+    /** Кнопка, которая повторяет действие, пока её держат. */
+    private fun repeatOnHold(action: () -> Unit): View.OnTouchListener {
+        var repeat: Runnable? = null
+        return View.OnTouchListener { v, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    action()
+                    val r = object : Runnable {
+                        override fun run() {
+                            action()
+                            handler.postDelayed(this, 70)
+                        }
+                    }
+                    repeat = r
+                    handler.postDelayed(r, 450)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    repeat?.let { handler.removeCallbacks(it) }
+                    repeat = null
+                }
+            }
+            true
+        }
+    }
+
     // ---------------------------------------------------------------- правка текста
 
-    private fun needsSpace(text: String, word: String): Boolean =
-        text.isNotEmpty() && !text.last().isWhitespace() && word.isNotEmpty() && word.first() !in ".,!?;:)»…"
+    private fun blockText(b: Block): String? = when (b) {
+        is Block.Para -> b.text
+        is Block.Task -> b.text
+        else -> null
+    }
 
-    private fun joinWord(text: String, word: String): String =
-        if (needsSpace(text, word)) "$text $word" else text + word
+    private fun setBlockText(b: Block, t: String) {
+        when (b) {
+            is Block.Para -> b.text = t
+            is Block.Task -> b.text = t
+            else -> Unit
+        }
+    }
+
+    /** Позиция курсора в строке text (offset -1 или за концом — конец строки). */
+    private fun caretPos(text: String): Int =
+        if (note.caretOffset < 0 || note.caretOffset > text.length) text.length else note.caretOffset
+
+    private fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '-'
+
+    /**
+     * Что вставить у курсора с учётом пробелов. Если курсор поставлен пальцем внутрь текста
+     * и вставка короткая (1–2 знака) рядом со словом — без пробелов: это исправление буквы.
+     * При обычном письме в конец строки — слова через пробел («Привет» + «на» = «Привет на»).
+     */
+    private fun spacedInsert(before: String, after: String, word: String): String {
+        if (word.isEmpty()) return word
+        val placedCaret = note.caretOffset >= 0
+        val touchesWord = (before.isNotEmpty() && isWordChar(before.last())) || (after.isNotEmpty() && isWordChar(after.first()))
+        if (placedCaret && word.length <= 2 && word.all { isWordChar(it) } && touchesWord) return word
+        val lead = before.isNotEmpty() && !before.last().isWhitespace() && word.first() !in ".,!?;:)»…"
+        val trail = after.isNotEmpty() && !after.first().isWhitespace() && after.first() !in ".,!?;:)»…" && !word.last().isWhitespace()
+        return (if (lead) " " else "") + word + (if (trail) " " else "")
+    }
 
     /** Блок под курсором, в который можно писать текст (если курсор на картинке — новая строка после неё). */
     private fun caretTextBlock(): Block {
@@ -514,41 +599,117 @@ class NoteActivity : Activity(), NoteInkView.Host {
         if (b == null || b is Block.Image) {
             note.blocks.add(note.caret + 1, Block.Para(""))
             note.caret += 1
+            note.caretOffset = -1
         }
         return note.blocks[note.caret]
     }
 
-    private fun editCaret(f: (String) -> String) {
+    /** Вставить текст у курсора. raw = true — как есть, без расстановки пробелов. */
+    private fun insertAtCaret(word: String, raw: Boolean = false) {
+        if (word.isEmpty()) return
         pushUndo()
-        when (val b = caretTextBlock()) {
-            is Block.Para -> b.text = f(b.text)
-            is Block.Task -> b.text = f(b.text)
-            else -> Unit
-        }
+        val b = caretTextBlock()
+        val text = blockText(b) ?: return
+        val pos = caretPos(text)
+        val before = text.substring(0, pos)
+        val after = text.substring(pos)
+        val ins = if (raw) word else spacedInsert(before, after, word)
+        setBlockText(b, before + ins + after)
+        if (note.caretOffset >= 0) note.caretOffset = pos + ins.length
         changed()
     }
 
+    private fun editCaret(f: (String) -> String) {
+        pushUndo()
+        val b = caretTextBlock()
+        blockText(b)?.let { setBlockText(b, f(it)) }
+        note.caretOffset = -1
+        changed()
+    }
+
+    private var lastCharDelete = 0L
+
+    /** Стереть одну букву перед курсором. В начале строки — соединить со строкой выше. */
+    private fun deleteChar() {
+        val b = note.blocks.getOrNull(note.caret) ?: return
+        val text = blockText(b)
+        val now = android.os.SystemClock.uptimeMillis()
+        val coalesce = now - lastCharDelete < 1500 // серия нажатий — один шаг отмены
+        lastCharDelete = now
+        if (text == null) {
+            hint("Курсор на картинке — нажмите на строку с текстом")
+            return
+        }
+        val pos = caretPos(text)
+        if (pos > 0) {
+            if (!coalesce) pushUndo()
+            val cut = text.offsetByCodePoints(pos, -1)
+            setBlockText(b, text.substring(0, cut) + text.substring(pos))
+            if (note.caretOffset >= 0) note.caretOffset = cut
+            changed()
+            return
+        }
+        // Курсор в начале строки: соединяем с предыдущей строкой (как на клавиатуре).
+        val prevIndex = note.caret - 1
+        val prev = note.blocks.getOrNull(prevIndex)
+        val prevText = prev?.let { blockText(it) }
+        if (prev == null || prevText == null) {
+            if (text.isEmpty() && note.blocks.size > 1) {
+                if (!coalesce) pushUndo()
+                note.blocks.removeAt(note.caret)
+                note.caret = max(0, note.caret - 1)
+                note.caretOffset = -1
+                changed()
+            }
+            return
+        }
+        if (!coalesce) pushUndo()
+        setBlockText(prev, prevText + text)
+        note.blocks.removeAt(note.caret)
+        note.caret = prevIndex
+        note.caretOffset = if (text.isEmpty()) -1 else prevText.length
+        changed()
+    }
+
+    /** Стереть слово перед курсором (вместе с пробелами вокруг). */
     private fun deleteWord() {
         val b = note.blocks.getOrNull(note.caret)
-        val text = when (b) { is Block.Para -> b.text; is Block.Task -> b.text; else -> null }
-        if (text != null && text.isNotBlank()) {
-            editCaret { it.replace(Regex("""\s*\S+\s*$"""), "") }
+        val text = b?.let { blockText(it) }
+        if (b != null && text != null && text.isNotBlank()) {
+            val pos = caretPos(text)
+            val before = text.substring(0, pos).replace(Regex("""\s*\S+\s*$"""), "")
+            if (before.length == pos) return
+            pushUndo()
+            setBlockText(b, before + text.substring(pos))
+            if (note.caretOffset >= 0) note.caretOffset = before.length
+            changed()
         } else if (note.blocks.size > 1) {
             pushUndo()
             note.blocks.removeAt(note.caret)
             note.caret = max(0, note.caret - 1)
+            note.caretOffset = -1
             changed()
         }
     }
 
+    /** Новая строка (или задача). Если курсор внутри строки — текст после курсора переносится. */
     private fun newLine(task: Boolean) {
         pushUndo()
         val b = note.blocks.getOrNull(note.caret)
+        val text = b?.let { blockText(it) }
         if (task && b is Block.Para && b.text.isBlank()) {
             note.blocks[note.caret] = Block.Task("", false)
+        } else if (b != null && text != null) {
+            val pos = caretPos(text)
+            setBlockText(b, text.substring(0, pos).trimEnd())
+            val rest = text.substring(pos).trimStart()
+            note.blocks.add(note.caret + 1, if (task) Block.Task(rest, false) else Block.Para(rest))
+            note.caret += 1
+            note.caretOffset = if (rest.isEmpty()) -1 else 0
         } else {
             note.blocks.add(note.caret + 1, if (task) Block.Task("", false) else Block.Para(""))
             note.caret += 1
+            note.caretOffset = -1
         }
         changed()
     }
@@ -849,13 +1010,13 @@ class NoteActivity : Activity(), NoteInkView.Host {
     }
 
     private fun preContext(): String {
+        // Текст перед курсором (до 20 знаков): строки выше + начало текущей строки до курсора.
         val sb = StringBuilder()
         for (i in 0..min(note.caret, note.blocks.size - 1)) {
-            when (val b = note.blocks[i]) {
-                is Block.Para -> { if (sb.isNotEmpty()) sb.append(' '); sb.append(b.text) }
-                is Block.Task -> { if (sb.isNotEmpty()) sb.append(' '); sb.append(b.text) }
-                else -> Unit
-            }
+            val t = blockText(note.blocks[i]) ?: continue
+            val part = if (i == note.caret) t.substring(0, caretPos(t)) else t
+            if (sb.isNotEmpty()) sb.append(' ')
+            sb.append(part)
         }
         return sb.takeLast(20).toString()
     }
@@ -926,17 +1087,11 @@ class NoteActivity : Activity(), NoteInkView.Host {
             changed(render = false)
             return
         }
-        pushUndo()
-        when (val b = caretTextBlock()) {
-            is Block.Para -> b.text = joinWord(b.text, best)
-            is Block.Task -> b.text = joinWord(b.text, best)
-            else -> Unit
-        }
         val bb = NoteInkView.bounds(g.strokes)
         wordHeights += bb[3] - bb[1]
         while (wordHeights.size > 15) wordHeights.removeAt(0)
         ink.fade(g.strokes, style)
-        changed()
+        insertAtCaret(best)
     }
 
     /** Выполнить действие после того, как недописанные слова станут текстом (чтобы не сбить порядок). */

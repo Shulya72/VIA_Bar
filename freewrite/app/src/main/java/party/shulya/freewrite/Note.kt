@@ -31,6 +31,9 @@ class Note(
     val drawings: MutableList<Drawing>,
     var caret: Int,
 ) {
+    /** Позиция курсора внутри строки caret; -1 — в конце строки. */
+    var caretOffset: Int = -1
+
     val tasksDone: Int get() = blocks.count { it is Block.Task && it.done && it.text.isNotBlank() }
     val tasksOpen: Int get() = blocks.count { it is Block.Task && !it.done && it.text.isNotBlank() }
 
@@ -52,6 +55,7 @@ class Note(
         o.put("created", created)
         o.put("updated", updated)
         o.put("caret", caret)
+        o.put("caretOff", caretOffset)
         val bl = JSONArray()
         for (b in blocks) {
             val j = JSONObject()
@@ -114,7 +118,7 @@ class Note(
                 blocks = blocks,
                 drawings = drawings,
                 caret = o.optInt("caret", blocks.size - 1).coerceIn(0, blocks.size - 1),
-            )
+            ).apply { caretOffset = o.optInt("caretOff", -1) }
         }
     }
 }

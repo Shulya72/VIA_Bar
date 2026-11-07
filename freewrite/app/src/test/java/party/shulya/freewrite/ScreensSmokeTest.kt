@@ -107,6 +107,64 @@ class ScreensSmokeTest {
     }
 
     @Test
+    @Config(qualifiers = "w800dp-h1280dp-port-xhdpi")
+    fun note_deleteLettersAtEndAndInsideWord() {
+        val n = Note.create("Буквы")
+        n.blocks.clear()
+        n.blocks += Block.Para("как дилаа")
+        n.caret = 0
+        NoteStore(ctx).save(n)
+        val controller = Robolectric.buildActivity(
+            NoteActivity::class.java,
+            Intent(ctx, NoteActivity::class.java).putExtra(NoteActivity.EXTRA_ID, n.id),
+        ).setup()
+        val root = controller.get().window.decorView
+        idle()
+        val letter = root.findViewWithTag<View>("mini_letter")
+
+        // Две лишние буквы в конце: «как дилаа» → «как дил».
+        press(letter); press(letter)
+        // Палец — между «и» и «л» в «дил», потом «буква»: «как дил» → «как дл».
+        val tv = findAll(root) { it is android.widget.TextView && it.text.toString().startsWith("как д") }.first() as android.widget.TextView
+        val ink = find(root, NoteInkView::class.java)
+        val t = IntArray(2); val o = IntArray(2)
+        tv.getLocationInWindow(t); ink.getLocationInWindow(o)
+        val x = t[0] - o[0] + tv.paddingLeft + tv.layout.getPrimaryHorizontal(6)
+        val y = t[1] - o[1] + tv.paddingTop + (tv.layout.getLineTop(0) + tv.layout.getLineBottom(0)) / 2f
+        tap(ink, MotionEvent.TOOL_TYPE_FINGER, x, y)
+        press(letter)
+
+        controller.pause()
+        assertEquals("как дл", (NoteStore(ctx).load(n.id)!!.blocks[0] as Block.Para).text)
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp-port-xhdpi")
+    fun note_insertSpacing() {
+        val n = Note.create("Пробелы")
+        NoteStore(ctx).save(n)
+        val activity = Robolectric.buildActivity(
+            NoteActivity::class.java,
+            Intent(ctx, NoteActivity::class.java).putExtra(NoteActivity.EXTRA_ID, n.id),
+        ).setup().get()
+        idle()
+        val noteField = NoteActivity::class.java.getDeclaredField("note").apply { isAccessible = true }
+        val insert = NoteActivity::class.java.getDeclaredMethod("insertAtCaret", String::class.java, Boolean::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+        fun check(text: String, offset: Int, word: String, expected: String) {
+            val note = noteField.get(activity) as Note
+            note.blocks.clear(); note.blocks += Block.Para(text); note.caret = 0; note.caretOffset = offset
+            insert.invoke(activity, word, false)
+            assertEquals("«$text» + «$word»", expected, ((noteField.get(activity) as Note).blocks[0] as Block.Para).text)
+        }
+        check("Привет", -1, "на", "Привет на")      // обычное письмо: короткое слово через пробел
+        check("Привет", -1, ",", "Привет,")          // знак препинания — без пробела
+        check("дл", 1, "и", "дил")                   // курсор внутри слова: исправление буквы
+        check("мир", 0, "новый", "новый мир")        // слово перед словом — пробел после
+        check("", -1, "Привет", "Привет")
+    }
+
+    @Test
     @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
     fun note_landscape() {
         val n = sampleNote()
@@ -160,6 +218,14 @@ class ScreensSmokeTest {
         val down = SystemClock.uptimeMillis()
         view.dispatchTouchEvent(event(down, down, MotionEvent.ACTION_DOWN, x, y, tool))
         view.dispatchTouchEvent(event(down, down + 60, MotionEvent.ACTION_UP, x, y, tool))
+        idle()
+    }
+
+    /** Короткое нажатие на кнопку (пальцем). */
+    private fun press(view: View) {
+        val down = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(event(down, down, MotionEvent.ACTION_DOWN, view.width / 2f, view.height / 2f, MotionEvent.TOOL_TYPE_FINGER))
+        view.dispatchTouchEvent(event(down, down + 50, MotionEvent.ACTION_UP, view.width / 2f, view.height / 2f, MotionEvent.TOOL_TYPE_FINGER))
         idle()
     }
 
