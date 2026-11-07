@@ -56,6 +56,16 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
 
+      # Если сборка упала — показать, какие классы есть в библиотеке ML Kit (для разбора ошибки).
+      - name: ML Kit classes (diagnostic)
+        if: failure()
+        run: |
+          find ~/.gradle/caches -name "*.aar" -path "*mlkit*" | sort | while read -r f; do
+            echo "== $f"
+            unzip -p "$f" classes.jar > /tmp/classes.jar 2>/dev/null || continue
+            unzip -l /tmp/classes.jar | awk '{print $4}' | grep -i 'digitalink' | grep -v '\$' | head -120
+          done
+
       - name: Prepare files
         id: files
         run: |
