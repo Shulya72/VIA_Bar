@@ -126,11 +126,6 @@ class NoteInkView(context: Context, private val host: Host) : View(context) {
     private val fading = ArrayList<Pair<List<InkStroke>, Long>>()
     private var fadingStyle = StrokeStyle("pen", Ui.INK, Ui.dpf(context, 2.6f))
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     // Перо над экраном: маленькая точка цвета чернил (как у пера Samsung),
     // у ластика — тонкий серый круг размером со стирающую область.
     private val hoverDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -146,7 +141,6 @@ class NoteInkView(context: Context, private val host: Host) : View(context) {
             pointerIcon = android.view.PointerIcon.getSystemIcon(context, android.view.PointerIcon.TYPE_NULL)
         }
     }
-    private val path = Path()
 
     /** Плавно убрать штрихи, которые стали текстом. */
     fun fade(strokes: List<InkStroke>, style: StrokeStyle) {
@@ -317,68 +311,11 @@ class NoteInkView(context: Context, private val host: Host) : View(context) {
         if (fading.isNotEmpty()) postInvalidateOnAnimation()
     }
 
-    private fun drawStroke(canvas: Canvas, s: InkStroke, style: StrokeStyle, alpha: Int) {
-        val pts = s.points
-        if (pts.isEmpty()) return
-        paint.color = style.color
-        paint.alpha = if (style.kind == "marker") alpha * 80 / 255 else alpha
-        if (pts.size == 1 || style.kind != "pen") {
-            paint.strokeWidth = style.width
-            if (pts.size == 1) {
-                paint.style = Paint.Style.FILL
-                canvas.drawCircle(pts[0].x, pts[0].y, style.width * 0.6f, paint)
-                paint.style = Paint.Style.STROKE
-                return
-            }
-            path.reset()
-            path.moveTo(pts[0].x, pts[0].y)
-            for (i in 1 until pts.size) {
-                val a = pts[i - 1]
-                val b = pts[i]
-                path.quadTo(a.x, a.y, (a.x + b.x) / 2f, (a.y + b.y) / 2f)
-            }
-            path.lineTo(pts[pts.size - 1].x, pts[pts.size - 1].y)
-            canvas.drawPath(path, paint)
-            return
-        }
-        for (i in 1 until pts.size) {
-            val a = pts[i - 1]
-            val b = pts[i]
-            paint.strokeWidth = style.width * (0.45f + 1.1f * (a.pressure + b.pressure) / 2f)
-            canvas.drawLine(a.x, a.y, b.x, b.y, paint)
-        }
-    }
+    private val painter = InkPainter()
 
-    private fun drawDrawing(canvas: Canvas, d: Drawing) {
-        val pts = d.pts
-        val n = pts.size / 3
-        if (n == 0) return
-        paint.color = d.color
-        paint.alpha = if (d.kind == "marker") 80 else 255
-        if (n == 1) {
-            paint.style = Paint.Style.FILL
-            canvas.drawCircle(pts[0], pts[1], d.width * 0.6f, paint)
-            paint.style = Paint.Style.STROKE
-            return
-        }
-        if (d.kind == "pen") {
-            for (i in 1 until n) {
-                paint.strokeWidth = d.width * (0.45f + 1.1f * (pts[i * 3 - 1] + pts[i * 3 + 2]) / 2f)
-                canvas.drawLine(pts[i * 3 - 3], pts[i * 3 - 2], pts[i * 3], pts[i * 3 + 1], paint)
-            }
-        } else {
-            paint.strokeWidth = d.width
-            path.reset()
-            path.moveTo(pts[0], pts[1])
-            for (i in 1 until n) {
-                val ax = pts[i * 3 - 3]; val ay = pts[i * 3 - 2]
-                val bx = pts[i * 3]; val by = pts[i * 3 + 1]
-                path.quadTo(ax, ay, (ax + bx) / 2f, (ay + by) / 2f)
-            }
-            path.lineTo(pts[(n - 1) * 3], pts[(n - 1) * 3 + 1])
-            canvas.drawPath(path, paint)
-        }
-    }
+    private fun drawStroke(canvas: Canvas, s: InkStroke, style: StrokeStyle, alpha: Int) = painter.stroke(canvas, s, style, alpha)
+
+    private fun drawDrawing(canvas: Canvas, d: Drawing) = painter.drawing(canvas, d)
 
     companion object {
         const val FADE_MS = 260L

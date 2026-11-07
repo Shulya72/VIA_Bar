@@ -24,6 +24,7 @@ import java.io.File
 class HomeActivity : Activity() {
 
     private lateinit var store: NoteStore
+    private lateinit var boards: BoardStore
     private lateinit var list: LinearLayout
     private lateinit var updateBar: LinearLayout
     private lateinit var updateText: TextView
@@ -36,6 +37,7 @@ class HomeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = NoteStore(this)
+        boards = BoardStore(this)
         setContentView(buildUi())
         checkUpdates(silent = true)
     }
@@ -87,8 +89,8 @@ class HomeActivity : Activity() {
         starts.addView(startCard(R.drawable.ic_note, "Новая запись",
             "Совещание, планёрка, звонок. Пишете пером где угодно — слова сами собираются в текст.", true) { newNote() },
             LinearLayout.LayoutParams(0, Ui.WRAP, 1f).apply { marginEnd = dp(7f) })
-        starts.addView(startCard(R.drawable.ic_board, "Доска",
-            "Бесконечное поле: картинки, схемы, метки «сдано / не сдано». Будет в следующей версии.", false) {},
+        starts.addView(startCard(R.drawable.ic_board, "Новая доска",
+            "Бесконечное поле: картинки, схемы, надписи, метки «сдано / не сдано». Пальцем двигаете, пером пишете.", true) { newBoard() },
             LinearLayout.LayoutParams(0, Ui.WRAP, 1f).apply { marginStart = dp(7f) })
         col.addView(starts, LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { topMargin = dp(18f) })
 
@@ -132,25 +134,86 @@ class HomeActivity : Activity() {
 
     private fun renderList() {
         list.removeAllViews()
-        val notes = store.list()
-        if (notes.isEmpty()) {
+        // Записи и доски вместе, по дням, новые сверху.
+        val entries: List<Pair<Long, () -> View>> =
+            store.list().map { n -> n.created to { noteRow(n) } } +
+                boards.list().map { b -> b.created to { boardRow(b) } }
+        if (entries.isEmpty()) {
             list.addView(Ui.text(this, "Записей пока нет. Нажмите «Новая запись» и пишите пером в любом месте листа.", 15f, Ui.INK2).apply {
                 setPadding(dp(2f), dp(18f), dp(2f), dp(4f))
             })
             return
         }
         var lastDay = -1L
-        for (n in notes) {
-            val day = Ui.startOfDay(n.created)
+        for ((created, row) in entries.sortedByDescending { it.first }) {
+            val day = Ui.startOfDay(created)
             if (day != lastDay) {
                 lastDay = day
-                list.addView(Ui.text(this, Ui.dayTitle(n.created).uppercase(), 12f, Ui.MUTED, bold = true).apply {
+                list.addView(Ui.text(this, Ui.dayTitle(created).uppercase(), 12f, Ui.MUTED, bold = true).apply {
                     letterSpacing = 0.06f
                     setPadding(dp(2f), dp(18f), 0, dp(8f))
                 })
             }
-            list.addView(noteRow(n), LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { bottomMargin = dp(8f) })
+            list.addView(row(), LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { bottomMargin = dp(8f) })
         }
+    }
+
+    private fun boardRow(b: Board): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Ui.rounded(this@HomeActivity, Ui.PAPER, Ui.RULE, 12f)
+            setPadding(dp(14f), dp(12f), dp(14f), dp(12f))
+            setOnClickListener { openBoard(b.id) }
+            setOnLongClickListener { boardMenu(b); true }
+        }
+        row.addView(Ui.mono(this, Ui.time(b.created), 13f, Ui.INK2), LinearLayout.LayoutParams(dp(58f), Ui.WRAP))
+        val what = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        what.addView(Ui.text(this, b.title, 16f, Ui.INK, bold = true).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END })
+        val items = b.strokes.size + b.texts.size + b.images.size + b.stickers.size
+        what.addView(Ui.text(this, if (items == 0) "доска · пустая" else "доска · предметов: $items", 13f, Ui.MUTED))
+        row.addView(what, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
+        if (b.count(2) > 0) row.addView(Ui.chip(this, "${b.count(2)} сдано", Ui.OK, Ui.OK_SOFT), chipParams())
+        if (b.count(1) > 0) row.addView(Ui.chip(this, "${b.count(1)} в работе", Ui.WARN, Ui.WARN_SOFT), chipParams())
+        if (b.count(0) > 0) row.addView(Ui.chip(this, "${b.count(0)} не сдано", Ui.BAD, Ui.BAD_SOFT), chipParams())
+        return row
+    }
+
+    private fun openBoard(id: String) {
+        startActivity(Intent(this, BoardActivity::class.java).putExtra(BoardActivity.EXTRA_ID, id))
+    }
+
+    private fun newBoard() {
+        val b = Board.create("Доска")
+        boards.save(b)
+        openBoard(b.id)
+    }
+
+    private fun boardMenu(b: Board) {
+        AlertDialog.Builder(this)
+            .setTitle(b.title)
+            .setItems(arrayOf("Переименовать", "Удалить")) { _, which ->
+                if (which == 0) {
+                    val edit = EditText(this).apply { setText(b.title); setSelection(b.title.length); isSingleLine = true }
+                    val box = FrameLayout(this).apply { setPadding(dp(20f), dp(8f), dp(20f), 0); addView(edit) }
+                    AlertDialog.Builder(this)
+                        .setTitle("Название доски")
+                        .setView(box)
+                        .setPositiveButton("Готово") { _, _ ->
+                            val t = edit.text.toString().trim()
+                            if (t.isNotEmpty()) { b.title = t; boards.save(b); renderList() }
+                        }
+                        .setNegativeButton("Отмена", null)
+                        .show()
+                } else {
+                    AlertDialog.Builder(this)
+                        .setMessage("Удалить доску «${b.title}»? Вернуть её будет нельзя.")
+                        .setPositiveButton("Удалить") { _, _ -> boards.delete(b); renderList() }
+                        .setNegativeButton("Отмена", null)
+                        .show()
+                }
+            }
+            .show()
     }
 
     private fun noteRow(n: Note): View {

@@ -46,6 +46,12 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
+        <!-- Доска: бесконечное поле -->
+        <activity
+            android:name=".BoardActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode" />
+
         <!-- Проверка планшета (этап 1) и отчёт для разработчика -->
         <activity
             android:name=".DiagnosticsActivity"

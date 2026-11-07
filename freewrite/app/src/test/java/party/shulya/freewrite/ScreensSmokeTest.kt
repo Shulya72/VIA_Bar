@@ -164,6 +164,109 @@ class ScreensSmokeTest {
         check("", -1, "Привет", "Привет")
     }
 
+    /** Пример доски: оси, надписи, фото, три метки. */
+    private fun sampleBoard(): Board {
+        val b = Board.create("Секция 3 · приёмка")
+        fun line(x0: Float, y0: Float, x1: Float, y1: Float) =
+            Drawing("marker", Ui.MUTED, 2f, floatArrayOf(x0, y0, 0.5f, x1, y1, 0.5f))
+        for (x in listOf(80f, 280f, 480f, 680f)) b.strokes += line(x, 120f, x, 520f)
+        for (y in listOf(140f, 330f, 500f)) b.strokes += line(50f, y, 710f, y)
+        b.texts += BoardText(40f, 70f, 40f, "Секция 3 · приёмка работ", Ui.INK)
+        b.texts += BoardText(100f, 230f, 24f, "Фундамент", Ui.INK)
+        b.texts += BoardText(300f, 230f, 24f, "Колонны 2 эт.", Ui.INK)
+        b.texts += BoardText(500f, 420f, 24f, "Перекрытие", Ui.INK)
+        b.stickers += BoardSticker(100f, 250f, 2, 1.2f)
+        b.stickers += BoardSticker(300f, 250f, 1, 1.2f)
+        b.stickers += BoardSticker(500f, 440f, 0, 1.2f)
+        // «Фото» — картинка, нарисованная прямо в тесте.
+        val bmp = Bitmap.createBitmap(640, 440, Bitmap.Config.ARGB_8888)
+        Canvas(bmp).apply {
+            drawColor(android.graphics.Color.rgb(157, 185, 214))
+            drawRect(0f, 300f, 640f, 440f, android.graphics.Paint().apply { color = android.graphics.Color.rgb(139, 129, 114) })
+            drawRect(50f, 150f, 590f, 172f, android.graphics.Paint().apply { color = android.graphics.Color.rgb(201, 161, 90) })
+        }
+        val dir = File(ctx.filesDir, "note_images").apply { mkdirs() }
+        FileOutputStream(File(dir, "test-photo.jpg")).use { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        b.images += BoardImage("test-photo.jpg", 760f, 140f, 384f, 264f, 640, 440)
+        BoardStore(ctx).save(b)
+        return b
+    }
+
+    @Test
+    @Config(qualifiers = "w800dp-h1280dp-port-xhdpi")
+    fun board_penStatusPanEraseWrite() {
+        val b0 = sampleBoard()
+        val controller = Robolectric.buildActivity(
+            BoardActivity::class.java,
+            Intent(ctx, BoardActivity::class.java).putExtra(BoardActivity.EXTRA_ID, b0.id),
+        ).setup()
+        val activity = controller.get()
+        val root = activity.window.decorView
+        idle()
+        val view = find(root, BoardView::class.java)
+        view.fitAll()
+        idle()
+        screenshot(root, "board-portrait.png")
+        val board = { activity.board() }
+
+        // Ручка (включена сразу): штрих остаётся рисунком.
+        val strokes0 = board().strokes.size
+        drawStroke(view, MotionEvent.TOOL_TYPE_STYLUS, 0.3f, 0.75f)
+        assertEquals(strokes0 + 1, board().strokes.size)
+
+        // Ластик по этому штриху — стёрт.
+        root.findViewWithTag<View>("board_tool_eraser").performClick()
+        drawStroke(view, MotionEvent.TOOL_TYPE_STYLUS, 0.3f, 0.75f)
+        assertEquals(strokes0, board().strokes.size)
+
+        // Статус: касание пером на пустом месте — новая метка «Не сдано».
+        root.findViewWithTag<View>("board_tool_status").performClick()
+        tap(view, MotionEvent.TOOL_TYPE_STYLUS, view.width * 0.5f, view.height * 0.85f)
+        assertEquals(4, board().stickers.size)
+        assertEquals(0, board().stickers.last().status)
+
+        // Пальцем по метке — следующий статус («В работе»).
+        val s = board().stickers.last()
+        val sx = (s.x + s.w / 2 - board().camX) * board().camZ
+        val sy = (s.y + s.h / 2 - board().camY) * board().camZ
+        tap(view, MotionEvent.TOOL_TYPE_FINGER, sx, sy)
+        assertEquals(1, board().stickers.last().status)
+
+        // Палец двигает доску.
+        val camX0 = board().camX
+        drawStroke(view, MotionEvent.TOOL_TYPE_FINGER, 0.6f, 0.4f)
+        assertTrue("доска сдвинулась", board().camX != camX0)
+
+        // «В текст» без модели: надпись остаётся рисунком.
+        root.findViewWithTag<View>("board_tool_write").performClick()
+        drawStroke(view, MotionEvent.TOOL_TYPE_STYLUS, 0.2f, 0.6f)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1600))
+        assertEquals(strokes0 + 1, board().strokes.size)
+
+        controller.pause()
+        val saved = BoardStore(ctx).load(b0.id)!!
+        assertEquals(4, saved.stickers.size)
+        assertEquals(strokes0 + 1, saved.strokes.size)
+    }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
+    fun board_landscapeAndHomeList() {
+        val b0 = sampleBoard()
+        val activity = Robolectric.buildActivity(
+            BoardActivity::class.java,
+            Intent(ctx, BoardActivity::class.java).putExtra(BoardActivity.EXTRA_ID, b0.id),
+        ).setup().get()
+        idle()
+        find(activity.window.decorView, BoardView::class.java).fitAll()
+        idle()
+        screenshot(activity.window.decorView, "board-landscape.png")
+        sampleNote()
+        val home = Robolectric.buildActivity(HomeActivity::class.java).setup().get()
+        idle()
+        screenshot(home.window.decorView, "home-with-board.png")
+    }
+
     @Test
     @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
     fun note_landscape() {
