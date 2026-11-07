@@ -131,10 +131,20 @@ class NoteInkView(context: Context, private val host: Host) : View(context) {
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val hoverPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // Перо над экраном: маленькая точка цвета чернил (как у пера Samsung),
+    // у ластика — тонкий серый круг размером со стирающую область.
+    private val hoverDot = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val hoverRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.argb(150, 212, 71, 12)
-        strokeWidth = Ui.dpf(context, 1.5f)
+        color = Color.argb(140, 133, 146, 168)
+        strokeWidth = Ui.dpf(context, 1f)
+    }
+
+    init {
+        // Не показывать системный указатель пера поверх нашего — иначе два курсора.
+        if (Build.VERSION.SDK_INT >= 24) {
+            pointerIcon = android.view.PointerIcon.getSystemIcon(context, android.view.PointerIcon.TYPE_NULL)
+        }
     }
     private val path = Path()
 
@@ -295,7 +305,15 @@ class NoteInkView(context: Context, private val host: Host) : View(context) {
             for (s in strokes) drawStroke(canvas, s, fadingStyle, a)
         }
         canvas.restore()
-        hover?.let { canvas.drawCircle(it.x, it.y, Ui.dpf(context, 6f), hoverPaint) }
+        hover?.let {
+            if (host.isEraser()) {
+                canvas.drawCircle(it.x, it.y, Ui.dpf(context, 14f), hoverRing)
+            } else {
+                hoverDot.color = host.strokeStyle().color
+                hoverDot.alpha = 170
+                canvas.drawCircle(it.x, it.y, Ui.dpf(context, 2.5f), hoverDot)
+            }
+        }
         if (fading.isNotEmpty()) postInvalidateOnAnimation()
     }
 
