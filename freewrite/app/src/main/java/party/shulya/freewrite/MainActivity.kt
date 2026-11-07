@@ -124,7 +124,7 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         }
         updateDeviceText()
         watchNetwork()
-        engine.start()
+        engine.start(this)
         updateModelRows()
         updateDelayText()
         penText.text = canvasView.stats.summary()

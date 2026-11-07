@@ -1,6 +1,8 @@
 package party.shulya.freewrite
 
+import android.content.Context
 import android.os.SystemClock
+import com.google.mlkit.common.MlKit
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
@@ -62,12 +64,21 @@ class HandwritingEngine(private val log: (String) -> Unit) {
 
     fun language(tag: String): Language = languages.first { it.tag == tag }
 
-    fun start() {
+    fun start(context: Context) {
         try {
             manager = RemoteModelManager.getInstance()
-        } catch (t: Throwable) {
-            initError = describe(t)
-            log("ML Kit не запустился: $initError")
+        } catch (first: Throwable) {
+            // Обычно ML Kit запускается сам при старте приложения (MlKitInitProvider).
+            // Если система этого не сделала — запускаем вручную официальной функцией.
+            log("ML Kit не запустился сам (${describe(first)}), запускаю вручную")
+            try {
+                MlKit.initialize(context.applicationContext)
+                manager = RemoteModelManager.getInstance()
+                log("ML Kit запущен вручную")
+            } catch (t: Throwable) {
+                initError = describe(t)
+                log("ML Kit не запустился: $initError")
+            }
         }
         for (lang in languages) {
             try {

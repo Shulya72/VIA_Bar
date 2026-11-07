@@ -22,17 +22,25 @@ object DeviceInfo {
 
     fun staticLines(activity: Activity): List<Pair<String, String>> {
         val lines = ArrayList<Pair<String, String>>()
-        lines += "Устройство" to "${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})"
-        lines += "Система" to osLine()
-        lines += "Android API" to "${Build.VERSION.SDK_INT} (Android ${Build.VERSION.RELEASE})"
-        lines += "Сборка" to Build.DISPLAY
-        lines += "Процессор" to cpuLine()
-        lines += "Память" to memoryLine(activity)
-        lines += "Экран" to screenLine(activity)
-        lines += "Сервисы Google" to (packageVersion(activity, "com.google.android.gms") ?: "не установлены")
-        lines += "Google Play" to (packageVersion(activity, "com.android.vending") ?: "не установлен")
-        lines += "HMS Core (Huawei)" to (packageVersion(activity, "com.huawei.hwid") ?: "не установлен")
-        lines += "Перо в системе" to stylusLine()
+        // Каждая строка отдельно: если одну узнать не удалось, остальные всё равно видны.
+        fun line(name: String, value: () -> String) {
+            lines += name to try {
+                value()
+            } catch (t: Throwable) {
+                "не удалось узнать (${t.javaClass.simpleName}: ${t.message.orEmpty().take(120)})"
+            }
+        }
+        line("Устройство") { "${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})" }
+        line("Система") { osLine() }
+        line("Android API") { "${Build.VERSION.SDK_INT} (Android ${Build.VERSION.RELEASE})" }
+        line("Сборка") { Build.DISPLAY }
+        line("Процессор") { cpuLine() }
+        line("Память") { memoryLine(activity) }
+        line("Экран") { screenLine(activity) }
+        line("Сервисы Google") { packageVersion(activity, "com.google.android.gms") ?: "не установлены" }
+        line("Google Play") { packageVersion(activity, "com.android.vending") ?: "не установлен" }
+        line("HMS Core (Huawei)") { packageVersion(activity, "com.huawei.hwid") ?: "не установлен" }
+        line("Перо в системе") { stylusLine() }
         return lines
     }
 
@@ -95,7 +103,11 @@ object DeviceInfo {
     @Suppress("DEPRECATION")
     private fun screenLine(activity: Activity): String {
         val m = activity.resources.displayMetrics
-        val display: Display? = if (Build.VERSION.SDK_INT >= 30) activity.display else activity.windowManager.defaultDisplay
+        val display: Display? = try {
+            if (Build.VERSION.SDK_INT >= 30) activity.display else activity.windowManager.defaultDisplay
+        } catch (_: Throwable) {
+            activity.windowManager.defaultDisplay
+        }
         val mode = display?.mode
         val size = if (mode != null) "${mode.physicalWidth}×${mode.physicalHeight}" else "${m.widthPixels}×${m.heightPixels}"
         val rate = display?.refreshRate?.let { String.format(Locale.US, "%.0f Гц", it) } ?: "?"
