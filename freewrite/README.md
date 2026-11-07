@@ -16,7 +16,8 @@ FreeWrite — приложение для Huawei MatePad Mini. Вы пишете
 
 https://github.com/Shulya72/bar-menu/releases/download/freewrite-latest/FreeWrite.apk
 
-Откройте её **на планшете** в браузере. Страница со всеми файлами сборки:
+Откройте её **на планшете** в браузере. Страница со всеми файлами сборки (там же скриншоты
+экрана `screen-portrait.png` и `screen-landscape.png`, снятые при сборке):
 https://github.com/Shulya72/bar-menu/releases/tag/freewrite-latest
 
 ## Установка на MatePad Mini

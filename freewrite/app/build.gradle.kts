@@ -12,8 +12,8 @@ android {
         // HarmonyOS 4.x даёт приложениям Android 12 (API 31); 26 — запас для других планшетов.
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     signingConfigs {
@@ -48,6 +48,19 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric: экран приложения запускается на компьютере, без планшета и эмулятора.
+            isIncludeAndroidResources = true
+            all { test ->
+                test.testLogging {
+                    events("passed", "failed")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                }
+            }
+        }
+    }
 }
 
 kotlin {
@@ -60,4 +73,8 @@ dependencies {
     // Google ML Kit Digital Ink Recognition: распознаёт штрихи пера на самом устройстве.
     // Языковая модель (~20 МБ) скачивается один раз, дальше работает без интернета.
     implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
+
+    // Только для проверок на компьютере (в APK не попадает).
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

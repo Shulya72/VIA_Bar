@@ -92,6 +92,13 @@ jobs:
             done
           done
 
+      # Проверка экрана на компьютере (Robolectric): запуск, штрих пером, касание пальцем,
+      # скриншоты планшетного размера. Падение не мешает выложить APK, но видно в журнале.
+      - name: Screen check (Robolectric)
+        id: screencheck
+        continue-on-error: true
+        run: ./gradlew --no-daemon testDebugUnitTest
+
       - name: Prepare files
         id: files
         run: |
@@ -100,6 +107,9 @@ jobs:
           mkdir -p out
           cp app/build/outputs/apk/debug/app-debug.apk "out/FreeWrite-$ver.apk"
           cp app/build/outputs/apk/debug/app-debug.apk out/FreeWrite.apk
+          for f in app/build/screenshots/*.png; do
+            [ -f "$f" ] && cp "$f" "out/screen-$(basename "$f")"
+          done
           ls -la out
           sha256sum out/*.apk
           bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
@@ -120,7 +130,7 @@ jobs:
 
           Как установить на Huawei MatePad Mini: откройте на планшете ссылку на FreeWrite.apk,
           скачайте и установите. Подробная инструкция — freewrite/README.md в ветке ${GITHUB_REF_NAME}."
-          gh release create "$tag" out/*.apk \
+          gh release create "$tag" out/* \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "FreeWrite $VERSION — тестовая сборка" \

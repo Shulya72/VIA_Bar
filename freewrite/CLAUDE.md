@@ -25,11 +25,20 @@ MAL-CD56). Пишешь пером в любом месте поля, распо
 
 - Проект временно в репозитории `Shulya72/bar-menu`, только в рабочей ветке (`ccr-…`).
   **В `main` не вливать**: там автоматическая выкладка сайта бара. Позже — отдельный репозиторий.
-- В облачной среде Claude нет доступа к `dl.google.com` (Android SDK, Google Maven), поэтому
-  APK локально не собрать. Добавить хост в среду можно только из claude.ai на компьютере.
+- В облачной среде «Приложение Для Рукописного Ввода» с 07.11.2026 разрешены `dl.google.com`
+  и `developers.google.com`. Android SDK ставится в `/root/android-sdk` (cmdline-tools,
+  `platforms;android-35`, `build-tools;35.0.0`), затем:
+  `cd freewrite && ANDROID_HOME=/root/android-sdk ./gradlew assembleDebug` — около 30 с.
+  Maven Central иногда отвечает 429: просто повторить. Robolectric-тесты локально часто не
+  запускаются (429 на большой образ `android-all-instrumented`) — их гоняет CI.
+- Эмулятора Android в облачной среде нет: нет KVM, а эмулятору нужна аппаратная виртуализация.
 - Сборка — GitHub Actions «FreeWrite APK» (`.github/workflows/freewrite-apk.yml`): запускается
   при push в любую ветку кроме `main`, если менялась папка `freewrite/`. Логи —
   `mcp__github__get_job_logs`. При падении шаг «ML Kit classes (diagnostic)» печатает классы ML Kit.
+- В CI после сборки идёт шаг «Screen check (Robolectric)» (`app/src/test/.../MainActivitySmokeTest.kt`):
+  экран размером с MatePad Mini вертикально и горизонтально, штрих пером, касание пальцем.
+  Скриншоты `screen-portrait.png` и `screen-landscape.png` прикладываются к выпуску.
+  Шаг не блокирует выкладку APK (`continue-on-error`), результат смотреть в журнале.
 - Готовый APK: выпуск (pre-release) `freewrite-latest`, постоянная ссылка
   https://github.com/Shulya72/bar-menu/releases/download/freewrite-latest/FreeWrite.apk
 - Отладочный ключ подписи `freewrite-debug.keystore` создаётся в сборке (keytool) и хранится

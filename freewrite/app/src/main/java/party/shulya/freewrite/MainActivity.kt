@@ -76,6 +76,10 @@ class MainActivity : Activity(), InkCanvasView.Listener {
     private var candidates: List<Candidate> = emptyList()
     private var candidatesVersion = -1
 
+    /** Высоты слов, уже добавленных в текст, — по ним оцениваем высоту строки. */
+    private val wordHeights = ArrayList<Float>()
+    private var lastLineHeight = 0f
+
     private var staticDevice: List<Pair<String, String>> = emptyList()
     private var previousCrash: String? = null
     private val logLines = ArrayList<String>()
@@ -201,11 +205,13 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         val lang = engine.language(selectedLang)
         val version = canvasVersion
         val online = DeviceInfo.isOnline(this)
+        val lineHeight = estimateLineHeight(strokes)
+        lastLineHeight = lineHeight
         resultInfo.setTextColor(MUTED)
         resultInfo.text = "Распознаю…"
         engine.recognize(
             lang, strokes, preContext(),
-            canvasView.width.toFloat(), canvasView.height.toFloat(),
+            canvasView.width.toFloat(), lineHeight,
         ) { out ->
             // Показываем только ответ на самый свежий запрос. Старые ответы отбрасываем.
             if (out.requestId == engine.latestRequestId) {
@@ -214,6 +220,37 @@ class MainActivity : Activity(), InkCanvasView.Listener {
             }
         }
     }
+
+    /** Высота штрихов по вертикали (от самой верхней точки до самой нижней), в пикселях. */
+    private fun inkHeight(strokes: List<InkStroke>): Float {
+        var top = Float.MAX_VALUE
+        var bottom = -Float.MAX_VALUE
+        for (s in strokes) for (p in s.points) {
+            if (p.y < top) top = p.y
+            if (p.y > bottom) bottom = p.y
+        }
+        return if (bottom >= top) bottom - top else 0f
+    }
+
+    /**
+     * Оценка высоты одной строки: медиана высот уже добавленных в текст слов, а пока их нет —
+     * высота текущей надписи. С запасом 15%, не меньше 40 dp и не больше поля.
+     */
+    private fun estimateLineHeight(strokes: List<InkStroke>): Float {
+        val base = if (wordHeights.isNotEmpty()) {
+            val sorted = wordHeights.sorted()
+            sorted[sorted.size / 2]
+        } else {
+            inkHeight(strokes)
+        }
+        val min = dp(40).toFloat()
+        val max = max(min, canvasView.height.toFloat())
+        return (base * 1.15f).coerceIn(min, max)
+    }
+
+    /** Показать пробел в начале варианта как «␣» — для отчёта. */
+    private fun visible(text: String): String =
+        if (text.isNotEmpty() && text[0].isWhitespace()) "␣" + text.trimStart() else text
 
     private fun showOutcome(out: RecognitionOutcome, lang: HandwritingEngine.Language, online: Boolean, version: Int) {
         recognitionCount++
@@ -231,21 +268,21 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         }
         candidates = out.candidates
         candidatesVersion = version
-        val best = out.candidates.firstOrNull()?.text.orEmpty()
+        val best = out.candidates.firstOrNull()?.text.orEmpty().trim()
         resultText.text = best.ifEmpty { "(нет вариантов)" }
         resultInfo.setTextColor(MUTED)
         resultInfo.text = "${lang.title} · ${out.millis} мс · штрихов ${out.strokeCount} · " +
             (if (online) "интернет есть" else "без интернета") +
             "\nНажмите на вариант, чтобы добавить его в текст"
         out.candidates.take(8).forEachIndexed { i, c ->
-            candidatesRow.addView(chip(c.text, primary = i == 0) { commitText(c.text) })
+            candidatesRow.addView(chip(c.text.trim(), primary = i == 0) { commitText(c.text) })
         }
         val list = out.candidates.take(5).joinToString(" | ") { c ->
-            c.text + (c.score?.let { s -> " (" + String.format(Locale.US, "%.2f", s) + ")" } ?: "")
+            visible(c.text) + (c.score?.let { s -> " (" + String.format(Locale.US, "%.2f", s) + ")" } ?: "")
         }
         addAttempt(
             "$stamp #$n ${lang.tag} ${out.millis} мс, штрихов ${out.strokeCount}, точек ${out.pointCount}, " +
-                "интернет: ${if (online) "да" else "нет"} → $list",
+                "строка ${lastLineHeight.roundToInt()} px, интернет: ${if (online) "да" else "нет"} → $list",
         )
     }
 
@@ -272,9 +309,18 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         }
     }
 
-    /** Добавить слово в текст у курсора, очистить поле для письма. */
-    private fun commitText(text: String) {
+    /**
+     * Добавить слово в текст у курсора, очистить поле для письма.
+     * Если распознаватель сам поставил пробел в начале варианта, второй не добавляем.
+     */
+    private fun commitText(raw: String) {
+        val text = raw.trim()
         if (text.isEmpty()) return
+        val heightNow = inkHeight(canvasView.snapshot())
+        if (heightNow > 0f) {
+            wordHeights.add(heightNow)
+            if (wordHeights.size > 15) wordHeights.removeAt(0)
+        }
         val e = docEdit.text
         var start = docEdit.selectionStart
         var end = docEdit.selectionEnd
@@ -406,7 +452,10 @@ class MainActivity : Activity(), InkCanvasView.Listener {
         engine.initError?.let { sb.append("Ошибка запуска ML Kit: ").append(it).append('\n') }
         for (line in engine.reportLines()) sb.append(line).append('\n')
         sb.append("Пауза перед распознаванием: ").append(delayMs).append(" мс, автораспознавание: ")
-            .append(if (autoRecognize) "вкл" else "выкл").append("\n\n")
+            .append(if (autoRecognize) "вкл" else "выкл").append('\n')
+        sb.append("Высота строки для распознавателя: ").append(lastLineHeight.roundToInt())
+            .append(" px (по словам в тексте: ").append(wordHeights.size).append("); поле: ")
+            .append(canvasView.width).append('×').append(canvasView.height).append(" px\n\n")
         sb.append("== Перо ==\n")
         sb.append(canvasView.stats.report()).append("\n\n")
         sb.append("== Распознавания (").append(attempts.size).append(") ==\n")
